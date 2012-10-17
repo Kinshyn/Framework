@@ -12,6 +12,8 @@
 
 class Yab_Helper_Pager {
 
+	const FILTER_PARAM_SEPARATOR = '~';
+
 	private $_statement = null;
 	
 	private $_prefix = null;
@@ -19,7 +21,6 @@ class Yab_Helper_Pager {
 	private $_session = null;
 	
 	private $_request = null;
-	private $_request_params = 0;
 	
 	private $_multi_sort = true;
 
@@ -35,17 +36,19 @@ class Yab_Helper_Pager {
 	
 	private $_total = null;
 	
-	private $_clear_url_tag = 'clear';
-	private $_export_url_tag = 'export';
-	private $_filter_prefix = 'filter_';
-	private $_filter_separator = '~';
+	private $_sort_url_tag = 's';
+	private $_order_url_tag = 'o';
+	private $_page_url_tag = 'p';
+	private $_per_page_url_tag = 'pp';
+	private $_clear_url_tag = 'c';
+	private $_export_url_tag = 'e';
+	private $_filter_url_tag = 'f';
 
-	public function __construct(Yab_Db_Statement $statement, $prefix = null, $request_params = 0) {
+	public function __construct(Yab_Db_Statement $statement, $prefix = null) {
 
 		$this->_statement = $statement;
 		
 		$this->_prefix = (string) $prefix;
-		$this->_request_params = (int) $request_params;	
 
 		$this->_request = Yab_Loader::getInstance()->getRequest();
 
@@ -64,151 +67,35 @@ class Yab_Helper_Pager {
 		
 		}
 		
-		if($this->_request->getParam($this->_request_params) == $this->_clear_url_tag)
-			$this->_session->clear();
+		if($this->_getParam($this->_clear_url_tag))
+			$this->_clear();
 		
 		$this->_order_by = $this->_statement->getOrderBy();
 		
 	}
 
-	public function getFilteredStatement() {
+	# usage 
 	
-		$adapter = $this->_statement->getAdapter();
-	
-		$statement = clone $this->_statement;
-		
-		$statement->free();
-		
-		$tables = $statement->getTables();
-
-		$filter_regexp = '#^'.preg_quote($this->_filter_prefix, '#').'([^'.preg_quote($this->_filter_separator, '#').']+)'.preg_quote($this->_filter_separator, '#').'([^'.preg_quote($this->_filter_separator, '#').']+)$#i';
-		
-		foreach($this->_request->getRequest() as $key => $value) {
-		
-			if(!preg_match($filter_regexp, $key, $match))
-				continue;
-			
-			$this->_session->set($match[0], $value);
-		
-		}
-
-		foreach($this->_session as $key => $value) {
-		
-			if(!preg_match($filter_regexp, $key, $match))
-				continue;
-			
-			$table_alias = $match[1];
-			$table_column = $match[2];
-			
-			if(!array_key_exists($table_alias, $tables))
-				continue;
-			
-			$table = $tables[$table_alias];
-			
-			$columns = $table->getColumns();
-			
-			if(!array_key_exists($table_column, $columns))
-				continue;
-			
-			$column = $columns[$table_column];
-			
-			if(is_array($value)) {
-			
-				if(count($value))
-					$statement->where($adapter->quoteIdentifier($table_alias).'.'.$adapter->quoteIdentifier($table_column).' IN ('.implode(', ', array_map(array($adapter, 'quote'), $value)).')');
-
-			} else {
-
-				if($value)
-					$statement->where($adapter->quoteIdentifier($table_alias).'.'.$adapter->quoteIdentifier($table_column).' LIKE '.$adapter->quote('%'.$value.'%'));
-
-			}
-		
-		}
-		
-		return $statement;
-	
-	}
-
 	public function getStatement($sql_limit = true) {
-	
-		$statement = $this->getFilteredStatement();
-		
-		$order_by = $this->getSqlOrderBy();
-		
+
+		$statement = $this->_getFilteredStatement();
+
+		$order_by = $this->_getSqlOrderBy();
+
 		if(count($order_by))
 			$statement->orderBy($order_by);
 
-		$this->export();
-			
+		$this->_export();
+
 		if($sql_limit)
 			return $statement->sqlLimit(($this->getCurrentPage() - 1) * $this->getPerPage(), $this->getPerPage());		
 
 		$this->_total = count($statement->query());
-	
+
 		return $statement->limit(($this->getCurrentPage() - 1) * $this->getPerPage(), $this->getPerPage());		
 
 	}
-	
-	public function export() {
 
-		if(!$this->_request->getGet()->has($this->_export_url_tag))
-			return $this;
-			
-		$statement = $this->getFilteredStatement();
-		
-		$order_by = $this->getSqlOrderBy();
-		
-		if(count($order_by))
-			$statement->orderBy($order_by);
-		
-		$file_name = $this->_prefix ? $this->_prefix : $this->_export_url_tag;
-		$file_name .= '_'.date('Y-m-d-H-i-s');
-		
-		if($this->_request->getGet()->get($this->_export_url_tag) == 'csv') {
-
-			$csv = new Yab_File_Csv($file_name.'.csv');
-
-			$csv->setDatas($statement);
-
-			Yab_Loader::getInstance()->getResponse()->download($csv);
-
-		}
-		
-		if($this->_request->getGet()->get($this->_export_url_tag) == 'xml') {
-
-			$xml = new Yab_File_Xml($file_name.'.xml');
-
-			$xml->setDatas($statement);
-
-			Yab_Loader::getInstance()->getResponse()->download($xml);
-
-		}
-		
-		return $this;
-
-	}
-	
-	public function getFilterStatement($table_alias, $column_key, $column_value) {
-	
-		$adapter = $this->_statement->getAdapter();
-	
-		return $this->getFilteredStatement()->select(
-			'DISTINCT '.
-			$adapter->quoteIdentifier($table_alias).'.'.$adapter->quoteIdentifier($column_key).', '.
-			$adapter->quoteIdentifier($table_alias).'.'.$adapter->quoteIdentifier($column_value)
-		)->orderBy(
-			array($column_value => 'asc')
-		)->setKey($column_key)->setValue($column_value);
-
-	}	
-	
-	public function getFilterName($table_alias, $column_key) {
-	
-		return $this->_filter_prefix.$table_alias.$this->_filter_separator.$column_key;
-
-	}
-	
 	public function getFilters(array $table_aliases) {
 
 		$form = null;
@@ -249,8 +136,8 @@ class Yab_Helper_Pager {
 		
 		}
 
-		$filter_name = $this->getFilterName($table_alias, $column_key);
-		
+		$filter_name = $this->_prefix.$this->_filter_url_tag.$table_alias.self::FILTER_PARAM_SEPARATOR.$column_key;
+	
 		$attributes = array(
 			'id' => $filter_name,
 			'name' => $filter_name,
@@ -260,9 +147,20 @@ class Yab_Helper_Pager {
 		
 		if($column_value) {
 		
-			$attributes['type'] = 'select';
-			$attributes['options'] = $this->getFilterStatement($table_alias, $column_key, $column_value);
+			$statement = $this->_getFilteredStatement();
+			$adapter = $statement->getAdapter();
 			
+			$statement->select(
+				'DISTINCT '.
+				$adapter->quoteIdentifier($table_alias).'.'.$adapter->quoteIdentifier($column_key).', '.
+				$adapter->quoteIdentifier($table_alias).'.'.$adapter->quoteIdentifier($column_value)
+			)->orderBy(
+				array($column_value => 'asc')
+			)->setKey($column_key)->setValue($column_value);
+		
+			$attributes['type'] = 'select';
+			$attributes['options'] = $statement;
+				
 		}
 				
 		$form->setElement($filter_name, $attributes);
@@ -275,101 +173,388 @@ class Yab_Helper_Pager {
 
 	}
 
-	public function getPagination($wave = 5, $total = true, $reset = true) {
+	public function getPagination($wave = 5, $total = true, $clear = true) {
 
 		$wave = (int) $wave;
 
 		$html = '<ul class="pager">';
 		
 		if(1 < max(1, $this->getCurrentPage() - $wave))
-			$html .= '<li><a href="'.$this->getRequest(1).'">1</a></li>';
+			$html .= '<li><a href="'.$this->getPageUrl($this->getFirstPage()).'">'.$this->getFirstPage().'</a></li>';
 		
 		if(2 < max(1, $this->getCurrentPage() - $wave))
 			$html .= '<li class="separator"><span>...</span></li>';
 
 		for($i = max(1, $this->getCurrentPage() - $wave); $i < $this->getCurrentPage(); $i++) 
-			$html .= '<li><a href="'.$this->getRequest($i).'">'.$i.'</a></li>';
+			$html .= '<li><a href="'.$this->getPageUrl($i).'">'.$i.'</a></li>';
 
 		$html .= '<li class="page"><span>'.$this->getCurrentPage().'</span></li>';
 		
 		for($i = $this->getCurrentPage() + 1; $i <= min($this->getCurrentPage() + $wave, $this->getLastPage()); $i++)
-			$html .= '<li><a href="'.$this->getRequest($i).'">'.$i.'</a></li>';
+			$html .= '<li><a href="'.$this->getPageUrl($i).'">'.$i.'</a></li>';
 
 		if($this->getCurrentPage() + $wave < $this->getLastPage() - 1)
 			$html .= '<li class="separator"><span>...</span></li>';
 			
 		if($this->getCurrentPage() + $wave < $this->getLastPage())
-			$html .= '<li><a href="'.$this->getRequest($this->getLastPage()).'">'.$this->getLastPage().'</a></li>';
+			$html .= '<li><a href="'.$this->getPageUrl($this->getLastPage()).'">'.$this->getLastPage().'</a></li>';
 		
 		if($total)
-			$html .= '<li class="total"><span>Total :</span> <a href="'.$this->getRequest(1, $this->getTotal()).'">'.$this->getTotal().'</a></li>';
+			$html .= '<li class="total"><span>Total :</span> <a href="'.$this->getPageUrl($this->getFirstPage(), $this->getTotal()).'">'.$this->getTotal().'</a></li>';
 			
-		if($reset)
-			$html .= '<li class="reset"><a href="'.$this->getRequest().'">Reset</a></li>';
+		if($clear)
+			$html .= '<li class="clear"><a href="'.$this->getClearUrl().'">Clear</a></li>';
 
 		$html .= '</ul>';
 		
 		return $html;
 
 	}
-	
-	public function getSortLink($column, $label = null) {
+
+	public function getSortLink($sort, $label = null) {
 	
 		if($label === null)
-			$label = $column;
+			$label = $sort;
 	
 		$filter_html = new Yab_Filter_Html();
 
-		$order = $this->getColumnOrder($column);
+		$order = $this->getSortOrder($sort);
+		$number = $this->getSortNumber($sort);
 		
-		if($order == 'asc') $arrow = $this->getColumnOrderNumber($column).'&uarr;&nbsp;';
-		elseif($order == 'desc') $arrow = $this->getColumnOrderNumber($column).'&darr;&nbsp;';
-		else $arrow = '';
+		$arrow = '';
+		
+		if($this->_multi_sort && $order == 'asc') $arrow = $number.'&uarr;&nbsp;';
+		elseif($this->_multi_sort && $order == 'desc') $arrow = $number.'&darr;&nbsp;';
+		
+		return $arrow.'<a href="'.$this->getSortUrl($sort, $order == 'asc' ? 'desc' : 'asc').'" class="'.$order.'">'.$filter_html->filter($label).'</a>';
+	
+	}
 
-		return $arrow.'<a href="'.$this->getUrl($column).'" class="'.$order.'">'.$filter_html->filter($label).'</a>';
+	public function getSortUrl($sort, $order = null) {
+
+		$number = $this->getSortNumber($sort);
+
+		return $this->getUrl(array($this->_sort_url_tag.$number => $sort, $this->_order_url_tag.$number => $order == 'desc' ? 'desc' : 'asc'));
 	
 	}
 	
-	public function getUrl($column, $order = null) {
+	public function getPageUrl($page, $per_page = null) {
 
-		return $this->getRequest($this->getCurrentPage(), $this->getPerPage(), $this->getOrderBy($column, $order));
+		return $this->getUrl(array($this->_page_url_tag => $page, $this->_per_page_url_tag => $per_page ? $per_page : $this->getPerPage()));
+	
+	}
+	
+	public function getClearUrl() {
+
+		return $this->getUrl(array($this->_clear_url_tag => 1));
+	
+	}
+	
+	public function getExportUrl($type = 'csv') {
+
+		return $this->getUrl(array($this->_export_url_tag => $type));
 
 	}
 
-	public function getRequest($current_page = null, $per_page = null, $order_by = null) {
+	public function getSorts() {
 
-		$params = array_slice($this->_request->getParams(), 0, $this->_request_params);
+		$sorts = array();
 
-		$clear_url = (bool) ($current_page === null && $per_page === null && $order_by === null);
-		
-		if($clear_url) {
-		
-			array_push($params, $this->_clear_url_tag);
-		
-		} else {
-		
-			if($current_page === null)
-				$current_page = $this->getCurrentPage();
+		$i = 1;
 
-			if($per_page === null)
-				$per_page = $this->getPerPage();
+		while($sort = $this->_getParam($this->_sort_url_tag.$i)) {
 		
-			array_push($params, $current_page);
-			array_push($params, $per_page);	
+			$order = $this->_getParam($this->_order_url_tag.$i) == 'desc' ? 'desc' : 'asc';
 			
-			if(!is_array($order_by))
-				$order_by = $this->getOrderBy();
+			if($sort)
+				$sorts[$sort] = $order;
+				
+			$i++;
+		
+		}
 
-			foreach($order_by as $column => $order)
-				array_push($params, $column, $order);
+		return $sorts;
+
+	}
+	
+	public function getUrl(array $params = array()) {
+
+		foreach($params as $key => $value) {
+
+			unset($params[$key]);
+			
+			$params[$this->_prefix.$key] = $value;
+		
+		}
+		
+		$params = array_merge($this->_request->getGet()->toArray(), $params);
+		
+		$params = array_merge($this->_session->toArray(), $params);
+
+		return $this->_request->getBaseUrl().$this->_request->getUri($params);
+	
+	}
+
+	# protected 
+
+	protected function _getFilteredStatement() {
+	
+		$adapter = $this->_statement->getAdapter();
+	
+		$statement = clone $this->_statement;
+		
+		$statement->free();
+
+		$filters = $this->_getFilters();
+
+		foreach($filters as $table_alias => $columns) {
+
+			foreach($columns as $column => $value) {
+				
+				if(is_array($value)) {
+
+					if(count($value))
+						$statement->where($adapter->quoteIdentifier($table_alias).'.'.$adapter->quoteIdentifier($column).' IN ('.implode(', ', array_map(array($adapter, 'quote'), $value)).')');
+
+				} else {
+
+					if($value)
+						$statement->where($adapter->quoteIdentifier($table_alias).'.'.$adapter->quoteIdentifier($column).' LIKE '.$adapter->quote('%'.$value.'%'));
+
+				}
+			
+			}
+
+		}
+
+		return $statement;
+
+	}
+
+	protected function _getSqlOrderBy() {
+
+		$sorts = $this->getSorts();
+
+		foreach($this->_order_by as $column_name => $column_order) {
+
+			$order = true;
+
+			foreach($sorts as $key => $value) {
+
+				if(preg_match('#'.preg_quote($key, '#').'#is', $column_name))
+					$order &= false;
+
+			}
+
+			if($order)
+				$sorts[$column_name] = $column_order;
+
+		}
+
+		$sanitize_sorts = array();
+		
+		foreach($sorts as $sort => $order) {
+		
+			$sort = $this->_validSort($sort);
+			
+			if(!$sort)
+				continue;
+				
+			$sanitize_sorts[$sort] = $order;
+	
+		}
+		
+		return $sanitize_sorts;
+
+	}
+
+	protected function _export() {
+
+		if(!($export = $this->_getParam($this->_export_url_tag)))
+			return $this;
+
+		$statement = $this->_getFilteredStatement();
+
+		$order_by = $this->_getSqlOrderBy();
+
+		if(count($order_by))
+			$statement->orderBy($order_by);
+
+		$file_name = $this->_prefix ? $this->_prefix : $this->_export_url_tag;
+		$file_name .= '_'.date('Y-m-d-H-i-s');
+
+		if($export == 'csv') {
+
+			$csv = new Yab_File_Csv($file_name.'.csv');
+
+			$csv->setDatas($statement);
+
+			Yab_Loader::getInstance()->getResponse()->download($csv);
+
+		} elseif($export == 'xml') {
+
+			$xml = new Yab_File_Xml($file_name.'.xml');
+
+			$xml->setDatas($statement);
+
+			Yab_Loader::getInstance()->getResponse()->download($xml);
+
+		}
+
+		return $this;
+
+	}
+	
+	protected function _clear() {
+		
+		$get = $this->_request->getGet();
+		
+		foreach($this->_session as $key => $value) {
+		
+			if($get->has($key))
+				$get->rem($key);
+		
+		}
+		
+		$this->_session->clear();
+		
+		$get = $this->_prefix ? $get->toArray() : array();
+		
+		foreach($get as $key => $value) {
+		
+			if(strpos($key, $this->_prefix) === 0)
+				unset($get[$key]);
+		
+		}
+
+		Yab_Loader::getInstance()->redirect($this->_request->getBaseUrl().$this->_request->getUri($get));
+		
+	}
+
+	protected function _validSort($column_name) {
+
+		if(!$column_name)
+			return '';
+		
+		if(preg_match('#^\s*SELECT(\s+.+\s+)FROM#is', $this->_statement->getPackedSql(), $match))
+			if(preg_match('#([a-z0-9\._]*'.preg_quote($column_name, '#').')([^a-z0-9\._]|$)#uis', $match[1], $match))
+				return $match[1];
+	
+		foreach($this->_statement->getTables() as $alias => $table) 
+			foreach($table->getColumns() as $column) 
+				if($column_name == $column->getName())
+					return $this->_statement->getAdapter()->quoteIdentifier($alias).'.'.$this->_statement->getAdapter()->quoteIdentifier($column_name);
+
+		return '';
+	
+	}
+	
+	protected function _getParam($key, $default = null) {
+
+		if($this->_request->getRequest()->has($this->_prefix.$key)) {
+		
+			if(in_array($key, array($this->_export_url_tag, $this->_clear_url_tag)))
+				return $this->_request->getRequest()->get($this->_prefix.$key);
+		
+			$this->_session->set($this->_prefix.$key, $this->_request->getRequest()->get($this->_prefix.$key));
 			
 		}
 
-		$filter_query_string = new Yab_Filter_QueryString();
+		if($this->_session->has($this->_prefix.$key))
+			return $this->_session->get($this->_prefix.$key);
+			
+		return $default;
+	
+	}
+	
+	protected function _getFilters() {
 
-		$query_string = $filter_query_string->filter($this->_request->getGet()->toArray());
+		$filters = array();
 
-		return rtrim(Yab_Loader::getInstance()->getRequest($this->_request->getController(), $this->_request->getAction(), $params), '?').($query_string ? '?'.$query_string : '');
+		$params = $this->_request->getPost()->toArray() + $this->_request->getGet()->toArray() + $this->_session->toArray();
+		
+		foreach($params as $key => $value) {
+		
+			if(!preg_match('#'.preg_quote($this->_prefix.$this->_filter_url_tag, '#').'([^'.preg_quote(self::FILTER_PARAM_SEPARATOR, '#').']+)'.preg_quote(self::FILTER_PARAM_SEPARATOR, '#').'([^'.preg_quote(self::FILTER_PARAM_SEPARATOR, '#').']+)$#i', $key, $match))
+				continue;
+
+			if(!array_key_exists($match[1], $filters) || !is_array($filters[$match[1]]))
+				$filters[$match[1]] = array();
+			
+			$filters[$match[1]][$match[2]] = $this->_getParam($this->_filter_url_tag.$match[1].self::FILTER_PARAM_SEPARATOR.$match[2]);
+
+		}
+		
+		return $filters;
+	
+	}
+	
+	# Getters
+
+	public function getSortOrder($asked_sort, $default = null) {
+
+		$sorts = $this->getSorts();
+
+		return array_key_exists($asked_sort, $sorts) ? $sorts[$asked_sort] : $default;
+
+	}
+
+	public function getSortNumber($asked_sort) {
+
+		$sorts = $this->getSorts();
+
+		$i = 1;
+
+		foreach($sorts as $sort => $order) {
+			
+			if($sort == $asked_sort)
+				return $i;
+				
+			$i++;
+		
+		}
+			
+		return $i;
+
+	}
+
+	public function getPerPage() {
+
+		if($this->_per_page !== null)
+			return $this->_per_page;
+
+		$this->_per_page = $this->_getParam($this->_per_page_url_tag);
+
+		if(!$this->_per_page)
+			$this->_per_page = $this->_default_per_page;
+
+		$this->_per_page = max(1, intval($this->_per_page));
+
+		if($this->_max_per_page)
+			$this->_per_page = min($this->_max_per_page, $this->_per_page);
+		
+		return $this->_per_page;
+
+	}
+
+	public function getCurrentPage() {
+
+		if($this->_current_page !== null)
+			return $this->_current_page;
+
+		$this->_current_page = $this->_getParam($this->_page_url_tag);
+
+		$this->_current_page = max(1, intval($this->_current_page));
+
+		$this->_current_page = min($this->getLastPage(), $this->_current_page);
+
+		return $this->_current_page;
+
+	}
+
+	public function getFirstPage() {
+
+		return $this->_first_page;
 
 	}
 
@@ -387,125 +572,6 @@ class Yab_Helper_Pager {
 		$this->_last_page = max(1, ceil($this->getTotal() / $this->getPerPage()));
 
 		return $this->_last_page;
-
-	}
-
-	public function getFirstPage() {
-
-		return $this->_first_page;
-
-	}
-
-	public function getCurrentPage() {
-
-		if($this->_current_page !== null)
-			return $this->_current_page;
-
-		$this->_current_page = $this->_getRequestParam(0);
-
-		$this->_current_page = max(1, intval($this->_current_page));
-
-		$this->_current_page = min($this->getLastPage(), $this->_current_page);
-
-		return $this->_current_page;
-
-	}
-
-	public function getPerPage() {
-
-		if($this->_per_page !== null)
-			return $this->_per_page;
-
-		$this->_per_page = $this->_getRequestParam(1);
-
-		if(!$this->_per_page)
-			$this->_per_page = $this->_default_per_page;
-
-		$this->_per_page = max(1, intval($this->_per_page));
-
-		if($this->_max_per_page)
-			$this->_per_page = min($this->_max_per_page, $this->_per_page);
-		
-		return $this->_per_page;
-
-	}
-
-	public function getColumnOrder($column) {
-
-		$order_by = $this->getOrderBy();
-
-		if(!array_key_exists($column, $order_by))
-			return '';
-
-		return $order_by[$column];
-
-	}
-
-	public function getColumnOrderNumber($column) {
-
-		$order_by = $this->getOrderBy();
-
-		if(!array_key_exists($column, $order_by))
-			return '';
-
-		$i = 1;
-			
-		foreach($order_by as $col => $order) {
-			
-			if($col == $column)
-				return $i;
-				
-			$i++;
-		
-		}
-			
-		return null;
-
-	}
-
-	public function getOrderBy($additionnal_column = null, $additionnal_order = null) {
-
-		$i = 0;
-
-		$order_by = array();
-
-		while(($column = $this->_getRequestParam(2 + $i)) && ($order = $this->_getRequestParam(3 + $i))) {
-
-			if($column && $this->_validSortColumn($column))
-				$order_by[$column] = strtolower($order) == 'desc' ? 'desc' : 'asc';
-
-			if(!$this->_multi_sort)
-				break;
-
-			$i = $i + 2;
-
-		}
-
-		if($additionnal_column && $this->_validSortColumn($additionnal_column)) {
-
-			if(!$this->_multi_sort)
-				$order_by = array_key_exists($additionnal_column, $order_by) ? array($additionnal_column => $order_by[$additionnal_column]) : array();
-
-			if($additionnal_order != 'desc')
-				$additionnal_order = 'asc';
-
-			if(!array_key_exists($additionnal_column, $order_by)) {
-
-				$order_by[$additionnal_column] = $additionnal_order;
-
-			} elseif($order_by[$additionnal_column] == 'asc') {
-
-				$order_by[$additionnal_column] = 'desc';
-
-			} else {
-
-				$order_by = array();
-
-			}
-
-		}
-
-		return $order_by;
 
 	}
 
@@ -531,54 +597,27 @@ class Yab_Helper_Pager {
 
 	}
 
-	public function getSqlOrderBy($additionnal_column = null, $additionnal_order = null) {
+	# Setters
 
-		$order_by = $this->getOrderBy($additionnal_column, $additionnal_order);
-
-		foreach($this->_order_by as $column_name => $column_order) {
-
-			$order = true;
-
-			foreach($order_by as $key => $value) {
-
-				if(preg_match('#'.preg_quote($key, '#').'#is', $column_name))
-					$order &= false;
-
-			}
-
-			if($order)
-				$order_by[$column_name] = $column_order;
-
-		}
-
-		$sanitize_order_by = array();
-		
-		foreach($order_by as $sort => $order) {
-		
-			$sort = $this->_validSortColumn($sort);
-			
-			if(!$sort)
-				continue;
-				
-			$sanitize_order_by[$sort] = $order;
+	public function setFilterUrlTag($tag) {
 	
-		}
+		$this->_filter_url_tag = (string) $tag;
 		
-		return $sanitize_order_by;
-
+		return $this;
+	
 	}
-
-	public function setFilterPrefix($prefix) {
 	
-		$this->_filter_prefix = (string) $prefix;
+	public function setPageUrlTag($tag) {
+	
+		$this->_page_url_tag = (string) $tag;
 		
 		return $this;
 	
 	}
 
-	public function setFilterSeparator($separator) {
+	public function setPerPageUrlTag($tag) {
 	
-		$this->_filter_separator = (string) $separator;
+		$this->_per_page_url_tag = (string) $tag;
 		
 		return $this;
 	
@@ -595,6 +634,22 @@ class Yab_Helper_Pager {
 	public function setExportUrlTag($tag) {
 	
 		$this->_export_url_tag = (string) $tag;
+		
+		return $this;
+	
+	}
+	
+	public function setSortUrlTag($tag) {
+	
+		$this->_sort_url_tag = (string) $tag;
+		
+		return $this;
+	
+	}	
+	
+	public function setOrderUrlTag($tag) {
+	
+		$this->_order_url_tag = (string) $tag;
 		
 		return $this;
 	
@@ -622,45 +677,6 @@ class Yab_Helper_Pager {
 
 		return $this;
 
-	}
-
-	private function _getRequestParam($key) {
-
-		$key = (int) $key;
-		
-		$key += $this->_request_params;
-		
-		$param = null;
-
-		if((count($this->_request->getParams()) - $this->_request_params < 2) && $this->_session->has('param_'.$key))
-			$param = $this->_session->get('param_'.$key);
-
-		if($this->_request->getParam($key))
-			$param = $this->_request->getParam($key);
-
-		if($param !== null)
-			$this->_session->set('param_'.$key, $param);
-
-		return $param;
-
-	}
-
-	private function _validSortColumn($column_name) {
-
-		if(!$column_name)
-			return '';
-		
-		if(preg_match('#^\s*SELECT(\s+.+\s+)FROM#is', $this->_statement->getPackedSql(), $match))
-			if(preg_match('#([a-z0-9\._]*'.preg_quote($column_name, '#').')([^a-z0-9\._]|$)#uis', $match[1], $match))
-				return $match[1];
-				
-		foreach($this->_statement->getTables() as $alias => $table) 
-			foreach($table->getColumns() as $column) 
-				if($column_name == $column->getName())
-					return $this->_statement->getAdapter()->quoteIdentifier($alias).'.'.$this->_statement->getAdapter()->quoteIdentifier($column_name);
-
-		return '';
-	
 	}
 
 }
