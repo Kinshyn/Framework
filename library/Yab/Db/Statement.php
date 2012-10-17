@@ -408,9 +408,7 @@ class Yab_Db_Statement implements Iterator, Countable {
 	}
 	
 	public function getTables() {
-	
-		echo '<pre>';
-	
+
 		$tables = array();
 
 		if(preg_match('#\s*SELECT\s+.+\s+FROM\s+(.+)\s*(ORDER\s+BY|LIMIT|GROUP|WHERE|INNER|LEFT|RIGHT|JOIN|$)#Uis', $this->getPackedSql(), $match))
