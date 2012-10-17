@@ -409,15 +409,17 @@ class Yab_Db_Statement implements Iterator, Countable {
 	
 	public function getTables() {
 	
+		echo '<pre>';
+	
 		$tables = array();
 
-		if(preg_match('#\s+FROM\s+([a-zA-Z0-9\-_.,\s]+)\s*(ORDER\s+BY|LIMIT|GROUP|WHERE|INNER|LEFT|RIGHT|JOIN|$)#is', $this->getPackedSql(), $match))
+		if(preg_match('#\s*SELECT\s+.+\s+FROM\s+(.+)\s*(ORDER\s+BY|LIMIT|GROUP|WHERE|INNER|LEFT|RIGHT|JOIN|$)#Uis', $this->getPackedSql(), $match))
 			$tables += $this->_extractTables(preg_split('#\s*,\s*#is', $match[1]));
 
 		preg_match_all('#\s+JOIN\s+(.+)\s+ON\s+(.+)(ORDER\s+BY|LIMIT|GROUP|WHERE|INNER|LEFT|RIGHT|JOIN|$)#Uis', $this->getPackedSql(), $match);
 
 		$tables += $this->_extractTables($match[1]);
-		
+
 		return $tables;
 	
 	}	
@@ -436,6 +438,10 @@ class Yab_Db_Statement implements Iterator, Countable {
 			$table = preg_split('#\s+#s', $table);
 		
 			$name = array_shift($table);
+			
+			$name = explode('.', $name);
+			$name = array_pop($name);
+			
 			$alias = array_shift($table);
 			
 			if(!$alias)
