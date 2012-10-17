@@ -213,12 +213,23 @@ class Yab_Controller_Request {
 
 		$uri = $this->_uri;
 
-		if(!$query_string) {
+		if($query_string !== true) {
 
 			$query_string_pos = strpos($uri, '?');
 
 			if(is_numeric($query_string_pos))
 				$uri = substr($uri, 0, $query_string_pos);
+			
+			if(is_array($query_string)) {
+			
+				$filter_query_string = new Yab_Filter_QueryString();
+			
+				$query_string = $filter_query_string->filter($query_string);
+			
+			}
+			
+			if(is_string($query_string) && 0 < strlen($query_string))
+				$uri .= '?'.$query_string;
 
 		}
 
