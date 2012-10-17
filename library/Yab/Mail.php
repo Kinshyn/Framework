@@ -352,6 +352,8 @@ class Yab_Mail {
 
 	public function encodeHeader($header, $charset = null, $encoding = null, $max_length = 76) {
 
+		$html = new Yab_Filter_Html();
+
 		$regexp = '#([\\x00-\\x1F\\x3D\\x3F\\x7F-\\xFF])#e';
 
 		if(!preg_match($regexp, $header))
@@ -373,7 +375,14 @@ class Yab_Mail {
 
 		$header = trim($header);
 
-		if($encoding == 'quoted-printable') {
+		if(preg_match('#(.+)(<.+@.+\..+>)#Uis', $header, $match)) {
+		
+			$header = $match[1];
+			$header = preg_replace($regexp, '"=".strtoupper(dechex(ord("\1")))', $header);
+			$header = preg_replace('#\s#', '_', $header);
+			$header = array($prefix.$header.$suffix.$match[2]);
+		
+		} elseif($encoding == 'quoted-printable') {
 
 			$header = preg_replace($regexp, '"=".strtoupper(dechex(ord("\1")))', $header);
 			$header = preg_replace('#\s#', '_', $header);
@@ -394,7 +403,7 @@ class Yab_Mail {
 				$header[$key] = $prefix.$value.$suffix;
 
 		}
-		
+
 		return implode(self::CRLF."\t", $header);
 
 	}
