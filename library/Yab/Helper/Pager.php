@@ -14,26 +14,19 @@ class Yab_Helper_Pager {
 
 	const FILTER_PARAM_SEPARATOR = '~';
 
-	private $_statement = null;
-	
 	private $_prefix = null;
 
+	private $_statement = null;
 	private $_session = null;
-	
 	private $_request = null;
 	
 	private $_multi_sort = true;
-
 	private $_first_page = 1;
-
 	private $_current_page = null;
 	private $_last_page = null;
 	private $_per_page = null;
 	private $_default_per_page = 25;
 	private $_max_per_page = null;
-
-	private $_order_by = array();
-	
 	private $_total = null;
 	
 	private $_sort_url_tag = 's';
@@ -69,8 +62,6 @@ class Yab_Helper_Pager {
 		
 		if($this->_getParam($this->_clear_url_tag))
 			$this->_clear();
-		
-		$this->_order_by = $this->_statement->getOrderBy();
 		
 	}
 
@@ -335,7 +326,9 @@ class Yab_Helper_Pager {
 
 		$sorts = $this->getSorts();
 
-		foreach($this->_order_by as $column_name => $column_order) {
+		$order_by = $this->_statement->getOrderBy();
+		
+		foreach($order_by as $column_name => $column_order) {
 
 			$order = true;
 
