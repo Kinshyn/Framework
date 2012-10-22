@@ -672,6 +672,18 @@ class Yab_Helper_Pager {
 
 	}
 
+	public function setCurrentPage($current_page) {
+
+		$this->_current_page = (int) $current_page;
+
+		$this->_current_page = max(1, intval($this->_current_page));
+
+		$this->_current_page = min($this->getLastPage(), $this->_current_page);
+
+		return $this;
+
+	}
+
 }
 
 // Do not clause PHP tags unless it is really necessary
