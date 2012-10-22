@@ -516,16 +516,8 @@ class Yab_Helper_Pager {
 		if($this->_per_page !== null)
 			return $this->_per_page;
 
-		$this->_per_page = $this->_getParam($this->_per_page_url_tag);
+		$this->setPerPage($this->_getParam($this->_per_page_url_tag));
 
-		if(!$this->_per_page)
-			$this->_per_page = $this->_default_per_page;
-
-		$this->_per_page = max(1, intval($this->_per_page));
-
-		if($this->_max_per_page)
-			$this->_per_page = min($this->_max_per_page, $this->_per_page);
-		
 		return $this->_per_page;
 
 	}
@@ -535,12 +527,8 @@ class Yab_Helper_Pager {
 		if($this->_current_page !== null)
 			return $this->_current_page;
 
-		$this->_current_page = $this->_getParam($this->_page_url_tag);
-
-		$this->_current_page = max(1, intval($this->_current_page));
-
-		$this->_current_page = min($this->getLastPage(), $this->_current_page);
-
+		$this->setCurrentPage($this->_getParam($this->_page_url_tag));
+		
 		return $this->_current_page;
 
 	}
@@ -680,6 +668,22 @@ class Yab_Helper_Pager {
 
 		$this->_current_page = min($this->getLastPage(), $this->_current_page);
 
+		return $this;
+
+	}
+
+	public function setPerPage($per_page) {
+
+		$this->_per_page = (int) $per_page;
+
+		if(!$this->_per_page)
+			$this->_per_page = $this->_default_per_page;
+
+		$this->_per_page = max(1, intval($this->_per_page));
+
+		if($this->_max_per_page)
+			$this->_per_page = min($this->_max_per_page, $this->_per_page);
+		
 		return $this;
 
 	}
