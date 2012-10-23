@@ -146,6 +146,20 @@ class Yab_Config extends Yab_Object {
 						
 				}
 	
+			} elseif(preg_match('#^yab_[a-zA-Z0-9_]+$#i', $value, $match)) {
+
+				try {
+			
+					$object = $loader->invoke($value);
+			
+					$registry->set($key, $object);
+
+				} catch(Yab_Exception $e) {
+				
+					continue;
+				
+				}
+
 			}
 
 		}
