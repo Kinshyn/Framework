@@ -3,33 +3,40 @@
  * Yab Framework
  *
  * @category   Yab
- * @package    Yab_Scaffholder
+ * @package    Yab_Scaffolder
  * @author     Yann BELLUZZI
  * @copyright  (c) 2010 YBellu
  * @license    http://www.ybellu.com/yab-framework/license.html
  * @link       http://www.ybellu.com/yab-framework 
  */
 
-class Yab_Scaffolder {
+class Yab_Scaffolder extends Yab_Object {
 
 	private $_db_adapter = null;
 
 	private $_directory = '';
-	
-	private $_modules = array();
 
-	public function __construct(Yab_Db_Adapter_Abstract $db, $directory = null) {
+	public function setDb(Yab_Db_Adapter_Abstract $db) {
 
 		$this->_db_adapter = $db;
-		
-		$this->_directory = (string) $directory;
+
+		return $this;
 
 	}
-	
+
+	public function getDbAdapter() {
+
+		if($this->_db_adapter === null)
+			$this->_db_adapter = Yab_Db_Adapter_Abstract::getDefaultAdapter();
+
+		return $this->_db_adapter;
+
+	}
+
 	public function setDirectory($directory) {
-		
+
 		$this->_directory = (string) $directory;
-		
+
 		return $this;
 
 	}
@@ -47,39 +54,39 @@ class Yab_Scaffolder {
 	}
 
 	public function scaffoldIndex($prefix = null) {
-	
+
 		$prefix_class = $this->getPrefixClass($prefix);
 		$prefix_file = $this->getPrefixFile($prefix);
 
-		$tables = $this->_db_adapter->getTables();
+		$tables = $this->getDbAdapter()->getTables();
 
 		$content = '<?php'.PHP_EOL.PHP_EOL;
-		
+
 		$content .= 'class Controller_'.$prefix_class.'Index extends Yab_Controller_Action {'.PHP_EOL.PHP_EOL;
-		
+
 		$content .= "\t".'public function actionIndex() {'.PHP_EOL.PHP_EOL;
 		$content .= "\t\t".'$this->_view->setFile(\'View'.DIRECTORY_SEPARATOR.'index'.DIRECTORY_SEPARATOR.'index.html\');'.PHP_EOL.PHP_EOL;
 		$content .= "\t".'}'.PHP_EOL.PHP_EOL;
-		
+
 		$content .= '}';
-		
+
 		$this->_scaffoldFile('Controller'.DIRECTORY_SEPARATOR.ucfirst($prefix_file).'Index.php', $content);
 
 		$content = '<dl>'.PHP_EOL;
 		$content .= "\t".'<dt>Menu</dt>'.PHP_EOL;
-		
+
 		foreach($tables as $table) 
 			$content .= "\t".'<dd><a href="<?php echo $this->getRequest(\''.ucfirst($table->getName()).'\', \'index\'); ?>">'.ucfirst($table->getName()).'</a></dd>'.PHP_EOL;
 
 		$content .= '</dl>';
-		
+
 		return $this->_scaffoldFile('View'.DIRECTORY_SEPARATOR.$prefix_file.'index'.DIRECTORY_SEPARATOR.'index.html', $content);
 
 	}
 
 	public function scaffoldModels($prefix = null) {
 
-		$tables = $this->_db_adapter->getTables();
+		$tables = $this->getDbAdapter()->getTables();
 
 		foreach($tables as $table) 
 			$this->scaffoldModel($table, $prefix);
@@ -90,7 +97,7 @@ class Yab_Scaffolder {
 
 	public function scaffoldViews($prefix = null) {
 
-		$tables = $this->_db_adapter->getTables();
+		$tables = $this->getDbAdapter()->getTables();
 
 		foreach($tables as $table) 
 			$this->scaffoldView($table, $prefix);
@@ -101,7 +108,7 @@ class Yab_Scaffolder {
 
 	public function scaffoldControllers($prefix = null) {
 
-		$tables = $this->_db_adapter->getTables();
+		$tables = $this->getDbAdapter()->getTables();
 
 		foreach($tables as $table) 
 			$this->scaffoldController($table, $prefix);
@@ -112,7 +119,7 @@ class Yab_Scaffolder {
 
 	public function scaffoldForms($prefix = null) {
 
-		$tables = $this->_db_adapter->getTables();
+		$tables = $this->getDbAdapter()->getTables();
 
 		foreach($tables as $table) 
 			$this->scaffoldForm($table, $prefix);
@@ -120,7 +127,7 @@ class Yab_Scaffolder {
 		return $this;
 
 	}
-	
+
 	public function getForeignTable(Yab_Db_Table_Column $column) {
 
 		if(!$column->getIndexed())
@@ -128,30 +135,30 @@ class Yab_Scaffolder {
 
 		if(preg_match('#^id_#', $column->getName()))
 			return substr($column->getName(), 3);
-	
+
 		if(preg_match('#_id$#', $column->getName()))
 			return substr($column->getName(), 0, -3);
-	
+
 		return null;
-	
+
 	}
-	
+
 	public function getClass($table_name) {
 
 		return implode('_', array_map('ucfirst', explode('_', $table_name)));
-	
+
 	}
-	
+
 	public function getPrefixClass($prefix) {
-	
+
 		return $prefix ? ucfirst(trim($prefix, '_')).'_' : '';
-	
+
 	}
-	
+
 	public function getPrefixFile($prefix) {
-	
+
 		return $prefix ? strtolower(trim($prefix, '_\\/').DIRECTORY_SEPARATOR) : '';
-	
+
 	}
 
 	public function scaffoldModel(Yab_Db_Table $table, $prefix = null) {
@@ -161,51 +168,55 @@ class Yab_Scaffolder {
 		$filter_pluralize = new Yab_Filter_Pluralize();
 		$prefix_class = $this->getPrefixClass($prefix);
 		$prefix_file = $this->getPrefixFile($prefix);
-	
+
 		$content = '<?php'.PHP_EOL.PHP_EOL;
-		
+
 		$content .= 'class Model_'.$prefix_class.$class.' extends Yab_Db_Table {'.PHP_EOL.PHP_EOL;
-		
+
 		$content .= "\t".'protected $_name = \''.$table->getName().'\';'.PHP_EOL.PHP_EOL;
 
-		$content .= "\t".'protected function _init() {'.PHP_EOL.PHP_EOL;
-				
-		foreach($table->getColumns() as $column) {
-			
-			$content .= "\t\t".'$column = new Yab_Db_Table_Column($this, \''.$column->getName().'\');'.PHP_EOL;
-			$content .= "\t\t".'$column->setPrimary(\''.$column->getPrimary().'\')->setUnique(\''.$column->getUnique().'\')->setSequence(\''.$column->getSequence().'\')->setNull(\''.$column->getNull().'\')->setUnsigned(\''.$column->getUnsigned().'\')->setDefaultValue(\''.$column->getDefaultValue().'\')->setIndexed(\''.$column->getIndexed().'\')->setNumber(\''.$column->getNumber().'\')->setQuotable(\''.$column->getQuotable().'\')->setType(\''.$column->getType().'\');'.PHP_EOL;	
-			$content .= "\t\t".'$this->addColumn(clone $column, true);'.PHP_EOL.PHP_EOL;		
-		
-		}	
-		
-		$content .= "\t".'}'.PHP_EOL.PHP_EOL;
+		if($this->has('model_cache_column') && $this->get('model_cache_column')) {
+
+			$content .= "\t".'protected function _init() {'.PHP_EOL.PHP_EOL;
+
+			foreach($table->getColumns() as $column) {
+
+				$content .= "\t\t".'$column = new Yab_Db_Table_Column($this, \''.$column->getName().'\');'.PHP_EOL;
+				$content .= "\t\t".'$column->setPrimary(\''.$column->getPrimary().'\')->setUnique(\''.$column->getUnique().'\')->setSequence(\''.$column->getSequence().'\')->setNull(\''.$column->getNull().'\')->setUnsigned(\''.$column->getUnsigned().'\')->setDefaultValue(\''.$column->getDefaultValue().'\')->setIndexed(\''.$column->getIndexed().'\')->setNumber(\''.$column->getNumber().'\')->setQuotable(\''.$column->getQuotable().'\')->setType(\''.$column->getType().'\');'.PHP_EOL;	
+				$content .= "\t\t".'$this->addColumn(clone $column, true);'.PHP_EOL.PHP_EOL;		
+
+			}	
+
+			$content .= "\t".'}'.PHP_EOL.PHP_EOL;
+
+		}
 
 		foreach($table->getColumns() as $column) {		
-			
+
 			$foreign_table = $this->getForeignTable($column);
-		
+
 			if($foreign_table) {
-			
+
 				$foreign_class = $this->getClass($foreign_table);
 
 				$content .= "\t".'public function get'.str_replace('_', '', $foreign_class).'() {'.PHP_EOL.PHP_EOL;
 				$content .= "\t\t".'return new Model_'.$foreign_class.'($this->get(\''.$column->getName().'\'));'.PHP_EOL.PHP_EOL;
 				$content .= "\t".'}'.PHP_EOL.PHP_EOL;
-					
+
 			}
-		
+
 		}
-		
+
 		$tables = $table->getAdapter()->getTables();
-		
+
 		foreach($tables as $_table) {
-		
+
 			if($_table->getName() == $table->getName()) { 
-			
+
 				# A TRAITER LES REFERENCE CIRCULAIRE
-	
+
 				continue;
-				
+
 			}
 		
 			foreach($_table->getColumns() as $column) {
