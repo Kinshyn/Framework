@@ -150,7 +150,7 @@ class Yab_Config extends Yab_Object {
 
 				try {
 			
-					$object = $loader->invoke($value);
+					$object = $loader->invoke($value, array());
 			
 					$registry->set($key, $object);
 
