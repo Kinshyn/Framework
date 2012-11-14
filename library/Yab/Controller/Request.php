@@ -37,8 +37,14 @@ class Yab_Controller_Request {
 	
 		$server = $this->getServer();
 	
+		if(!$server->has('SCRIPT_FILENAME'))
+			return $this;
+	
 		$script_dirname = rtrim(dirname($server->get('SCRIPT_FILENAME')), '\\/');
 
+		if(!$server->has('DOCUMENT_ROOT'))
+			return $this;
+			
 		$document_root = rtrim($server->get('DOCUMENT_ROOT'), '\\/');
 
 		$base_url = str_replace($document_root, '', $script_dirname);
@@ -47,7 +53,7 @@ class Yab_Controller_Request {
 
 	}
 
-	final private function _cleanGPC(array $datas = array()) {
+	final private function _cleanGPC(array $datas) {
 
 		if(get_magic_quotes_gpc() == 1) 
 			foreach($datas as $key => $value) 

@@ -350,8 +350,6 @@ class Yab_Loader {
 				$recursion->attach($var);
 					
 				$reflect = new ReflectionClass($var);
-
-				$reflect = new ReflectionClass($var);
 				
 				$properties = $reflect->getProperties();
 

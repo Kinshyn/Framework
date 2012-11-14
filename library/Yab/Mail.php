@@ -22,6 +22,8 @@ class Yab_Mail {
 	private $_charset = 'utf-8';
 	private $_encoding = 'quoted-printable';
 
+	private $_addresses_headers = array('return-path', 'sender', 'x-sender', 'from', 'to', 'cc', 'bcc', 'reply-to');
+	
 	public function __construct() {
 
 		$this->_boundary = '-----='.md5(uniqid(mt_rand()));
@@ -48,15 +50,27 @@ class Yab_Mail {
 
 	}
 
-	public function setFrom($mail, $alias = null) {
+	public function setFrom($from) {
 
-		return $this->setHeader('From', $this->formatRFC822($mail, $alias));
+		return $this->setHeader('From', $from);
 
 	}
 
-	public function setTo($mail, $alias = null) {
+	public function setTo($to) {
+	
+		return $this->setHeader('To', $to);
 
-		return $this->setHeader('To', $this->formatRFC822($mail, $alias));
+	}
+	
+	public function setCc($cc) {
+	
+		return $this->setHeader('cc', $cc);
+
+	}
+	
+	public function setBcc($bcc) {
+	
+		return $this->setHeader('bcc', $bcc);
 
 	}
 
@@ -113,15 +127,13 @@ class Yab_Mail {
 	}
 
 	public function send() {
-	
-		$email = new Yab_Filter_Email();
 
 		$to = $this->getHeader('To');
 		$subject = $this->getHeader('Subject');
 
 		$this->remHeader('To')->remHeader('Subject');
 
-		mail($email->filter($to), $this->encodeHeader($subject), $this->_parts(), $this->_headers());
+		mail($to, $this->encodeHeader($subject), $this->_parts(), $this->_headers());
 
 		return $this->setHeader('To', $to)->setHeader('Subject', $subject);
 
@@ -166,9 +178,15 @@ class Yab_Mail {
 
 	}
 
-	public function getHeader($name) {
+	public function getHeader($name, $encoded = false) {
 
-		return array_key_exists($name, $this->_headers) ? $this->_headers[$name] : null;
+		if(!array_key_exists($name, $this->_headers))
+			return null;
+			
+		if(in_array($name, $this->_addresses_headers))
+			return $this->formatRfc822($this->_headers[$name], $encoded);
+	
+		return $encoded ? $this->encodeHeader($this->_headers[$name]) : $this->_headers[$name];
 
 	}
 
@@ -222,8 +240,19 @@ class Yab_Mail {
 
 		$headers = '';
 
-		foreach($this->_headers as $name => $header) 
-			$headers .= $name.': '.$this->encodeHeader($header).self::CRLF;
+		foreach($this->_headers as $name => $header) {
+		
+			if(in_array(strtolower($name), array_map('strtolower', $this->_addresses_headers))) {
+		
+				$headers .= $name.': '.$this->formatRfc822($header, true).self::CRLF;
+			
+			} else {
+		
+				$headers .= $name.': '.$this->encodeHeader($header).self::CRLF;
+			
+			}
+			
+		}
 
 		if($this->isMultipart()) {
 
@@ -333,20 +362,103 @@ class Yab_Mail {
 		return $parts.'--'.$this->_boundary.'--';
 
 	}  
+	
+	public function splitAddresses($string, $split_chars = array(',', ';'), $quote_chars = array('"'), $escape_chars = array('\\')) {
+	
+		if(is_array($string))
+			return $string;
+			
+		$length = strlen($string);
 
-	public function formatRFC822($email, $alias = null) {
+		$part = '';
+
+		$parts = array();
+		
+		$escaped_char = false;
+		$quoted_string = false;
+		
+		for($i = 0; $i < $length; $i++) {
+		
+			$char = $string[$i];
+		
+			if(in_array($char, $split_chars)) {
+
+				if(!$quoted_string) {
+				
+					array_push($parts, $part);
+					
+					$part = '';
+					
+					$char = null; 
+					
+				}
+
+			} elseif(in_array($char, $quote_chars)) {
+		
+				if(!$escaped_char) 
+					$quoted_string = !$quoted_string;
+
+			}
+				
+			$escaped_char = false; 
+
+			if(in_array($char, $escape_chars) && !$escaped_char) 
+				$escaped_char = true; 
+	
+			$part .= $char;
+
+		}
+		
+		array_push($parts, $part);
+	
+		return $parts;
+
+	}
+
+	public function formatRfc822($addresses, $encoded = false) {
 
 		$validator = new Yab_Validator_Email();
 
-		if(!$validator->validate($email))
-			throw new Yab_Exception('"'.$email.'" is not a valid email');
+		$addresses = $this->splitAddresses($addresses);
+		
+		$rfc822_addresses = array();
+		
+		foreach($addresses as $address) {
+			
+			$address = trim($address);
+			$address = preg_replace('#(<[^>]+>)#s', ' $1', $address);
+			$address = preg_replace('#"([^\s"]+@[^\s"]+)#s', '" $1', $address);
+			$address = preg_split('#\s+#s', $address);
+			
+			$rfc822_address = array_pop($address);
+			$rfc822_address = trim($rfc822_address, '<>');
 
-		$email = '<'.$email.'>';
+			if(!$validator->validate($rfc822_address))
+				throw new Yab_Exception('"'.$rfc822_address.'" is not a valid email');
+			
+			$rfc822_address = '<'.$rfc822_address.'>';
+			
+			$rfc822_alias = implode(' ', $address);
+			
+			$rfc822_alias = trim($rfc822_alias);
+			
+			if($rfc822_alias) {
+				
+				if(!preg_match('#^".+"$#s', $rfc822_alias))
+					$rfc822_alias = '"'.str_replace('"', '\"', $rfc822_alias).'"';
+	
+				if($encoded)
+					$rfc822_alias = $this->encodeHeader($rfc822_alias);
+	
+				$rfc822_address = $rfc822_alias.' '.$rfc822_address;
+				
+			}
+				
+			array_push($rfc822_addresses, $rfc822_address);
 
-		if($alias !== null)
-			$email = '"'.str_replace('"', '', $alias).'" '.$email;
-
-		return $email;
+		}
+			
+		return implode(', ', $rfc822_addresses);
 
 	}
 
@@ -375,14 +487,14 @@ class Yab_Mail {
 
 		$header = trim($header);
 
-		if(preg_match('#(.+)(<.+@.+\..+>)#Uis', $header, $match)) {
+		// if(preg_match('#(.+)(<.+@.+\..+>)#Uis', $header, $match)) {
 		
-			$header = $match[1];
-			$header = preg_replace($regexp, '"=".strtoupper(dechex(ord("\1")))', $header);
-			$header = preg_replace('#\s#', '_', $header);
-			$header = array($prefix.$header.$suffix.$match[2]);
-		
-		} elseif($encoding == 'quoted-printable') {
+			// $header = $match[1];
+			// $header = preg_replace($regexp, '"=".strtoupper(dechex(ord("\1")))', $header);
+			// $header = preg_replace('#\s#', '_', $header);
+			// $header = array($prefix.$header.$suffix.$match[2]);
+			
+		if($encoding == 'quoted-printable') {
 
 			$header = preg_replace($regexp, '"=".strtoupper(dechex(ord("\1")))', $header);
 			$header = preg_replace('#\s#', '_', $header);

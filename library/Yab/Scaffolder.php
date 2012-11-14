@@ -24,15 +24,6 @@ class Yab_Scaffolder extends Yab_Object {
 
 	}
 
-	public function getDbAdapter() {
-
-		if($this->_db_adapter === null)
-			$this->_db_adapter = Yab_Db_Adapter_Abstract::getDefaultAdapter();
-
-		return $this->_db_adapter;
-
-	}
-
 	public function setDirectory($directory) {
 
 		$this->_directory = (string) $directory;
@@ -58,7 +49,7 @@ class Yab_Scaffolder extends Yab_Object {
 		$prefix_class = $this->getPrefixClass($prefix);
 		$prefix_file = $this->getPrefixFile($prefix);
 
-		$tables = $this->getDbAdapter()->getTables();
+		$tables = $this->_getDbAdapter()->getTables();
 
 		$content = '<?php'.PHP_EOL.PHP_EOL;
 
@@ -86,7 +77,7 @@ class Yab_Scaffolder extends Yab_Object {
 
 	public function scaffoldModels($prefix = null) {
 
-		$tables = $this->getDbAdapter()->getTables();
+		$tables = $this->_getDbAdapter()->getTables();
 
 		foreach($tables as $table) 
 			$this->scaffoldModel($table, $prefix);
@@ -97,7 +88,7 @@ class Yab_Scaffolder extends Yab_Object {
 
 	public function scaffoldViews($prefix = null) {
 
-		$tables = $this->getDbAdapter()->getTables();
+		$tables = $this->_getDbAdapter()->getTables();
 
 		foreach($tables as $table) 
 			$this->scaffoldView($table, $prefix);
@@ -108,7 +99,7 @@ class Yab_Scaffolder extends Yab_Object {
 
 	public function scaffoldControllers($prefix = null) {
 
-		$tables = $this->getDbAdapter()->getTables();
+		$tables = $this->_getDbAdapter()->getTables();
 
 		foreach($tables as $table) 
 			$this->scaffoldController($table, $prefix);
@@ -119,7 +110,7 @@ class Yab_Scaffolder extends Yab_Object {
 
 	public function scaffoldForms($prefix = null) {
 
-		$tables = $this->getDbAdapter()->getTables();
+		$tables = $this->_getDbAdapter()->getTables();
 
 		foreach($tables as $table) 
 			$this->scaffoldForm($table, $prefix);
@@ -502,8 +493,17 @@ class Yab_Scaffolder extends Yab_Object {
 		return $this->_scaffoldFile('Form'.DIRECTORY_SEPARATOR.ucfirst($prefix_file).$file.'.php', $content);
 
 	}
+
+	protected function _getDbAdapter() {
+
+		if($this->_db_adapter === null)
+			$this->_db_adapter = Yab_Db_Adapter_Abstract::getDefaultAdapter();
+
+		return $this->_db_adapter;
+
+	}
 	
-	private function _scaffoldFile($file_path, $content) {
+	protected function _scaffoldFile($file_path, $content) {
 
 		$file = new Yab_File($this->_directory.DIRECTORY_SEPARATOR.$file_path);
 		

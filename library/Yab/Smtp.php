@@ -72,6 +72,12 @@ class Yab_Smtp extends Yab_Socket {
 
 	}
 	
+	public function extractAddress($header) {
+	
+		return preg_replace('#^.*?('.Yab_Validator_Email::REGEXP.').*?$#', '$1', $header);
+	
+	}
+	
 	public function extractHeader($data, $header, $with_name = true) {
 	
 		$data = $this->crlf($data);
@@ -177,16 +183,14 @@ class Yab_Smtp extends Yab_Socket {
 	
 	public function send($data) {
 
-		$email = new Yab_Filter_Email();
-	
 		$data = $this->crlf($data);
 
 		$from = $this->extractHeader($data, 'return-path', false);
-		$from = $email->filter($from);
+		$from = $this->extractAddress($from);
 		$from = preg_replace('#=3D#i', '=', $from);
 
 		$to = $this->extractHeader($data, 'to', false);
-		$to = $email->filter($to);
+		$to = $this->extractAddress($to);
 		$to = preg_replace('#=3D#i', '=', $to);
 
 		$this->_command('MAIL FROM:'.$from);

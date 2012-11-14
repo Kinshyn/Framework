@@ -35,12 +35,12 @@ class Yab_Observer {
 		 	$event_params = $params;
 
 			foreach($callback['params'] as $key => $param) {
-				
+
 				if(is_numeric(strpos($param, self::PARAM)))
 					$param = str_replace(self::PARAM, array_shift($event_params), $param);
-				
+
 				$callback['params'][$key] = $param;
-					
+
 			}
 
 			Yab_Loader::getInstance()->invoke($callback['object'], $callback['method'], $callback['params']);
@@ -52,25 +52,25 @@ class Yab_Observer {
 	}
 
 	public function observe($event, $object, $method, array $params = array(), $priority = 20) {
-	
+
 		if(!array_key_exists($event, $this->_events))
 			$this->_events[$event] = array();
-			
+
 		$this->_events[$event][] = array(
 			'object' => $object,
 			'method' => $method,
 			'params' => $params,
 			'priority' => intval($priority),
 		);
-		
+
 		return $this;
-	
+
 	}
-	
+
 	private function prioritize(array $callback_a, array $callback_b) {
-	
+
 		return $callback_a['priority'] <= $callback_b['priority'];
-	
+
 	}
 
 }
