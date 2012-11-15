@@ -133,7 +133,7 @@ class Yab_Mail {
 
 		$this->remHeader('To')->remHeader('Subject');
 
-		mail($this->formatRfc822($to, true), $this->encodeHeader($subject), $this->_parts(), $this->_headers());
+		mail($to, $this->encodeHeader($subject), $this->_parts(), $this->_headers());
 
 		return $this->setHeader('To', $to)->setHeader('Subject', $subject);
 
