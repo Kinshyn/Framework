@@ -181,9 +181,7 @@ abstract class Yab_Db_Adapter_Abstract {
 	
 	final public function getColumns($table) {
 	
-		$table_name = (string) $table;
-	
-		return $this->_columns($table_name);
+		return $this->_columns($table);
 	
 	}
 
