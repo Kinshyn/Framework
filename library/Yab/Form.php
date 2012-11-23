@@ -125,12 +125,12 @@ class Yab_Form extends Yab_Object {
 
 		foreach($this->_elements as $element) { 
 
-			if(!$element->isSubmitted()) { 
-			
+			if($element->has('disabled') && strtolower($element->get('disabled')) == 'disabled')
+				continue;
+
+			if(!$element->isSubmitted()) 
 				return false;
-				
-			}
-			
+
 		}
 
 		return true;
@@ -144,11 +144,8 @@ class Yab_Form extends Yab_Object {
 
 		foreach($this->_elements as $element) {
 
-			if(!$element->isValid()) { 
-			
+			if(!$element->isValid()) 
 				return false;
-				
-			}
 
 		}
 		
