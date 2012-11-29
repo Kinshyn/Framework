@@ -12,55 +12,28 @@
 
 class Yab_Helper_Menu {
 
-	private $_match = null;
-	private $_request = null;
-	private $_label = null;
-	private $_visible = true;
-	private $_childs = array();
+	protected $_url = null;
+	protected $_match = null;
+	protected $_label = null;
+	protected $_visible = true;
+	
+	protected $_childs = array();
 
-	public function __construct(Yab_Controller_Request $request = null, $label = null, $match = null, $visible = true, array $childs = array()) {
+	public function __construct($url = null, $label = null, $match = null, $visible = true, array $childs = array()) {
 
-		if($request)
-			$this->setRequest($request);
-
-		if($label)
-			$this->setLabel($label);
-
-		if($match)
-			$this->setMatch($match);
-
+		$this->setUrl($url);
+		$this->setLabel($label);
+		$this->setMatch($match);
 		$this->setVisible($visible);
-
-		if(count($childs))
-			$this->setChilds($childs);
+		$this->setChilds($childs);
 
 	}
 
-	public function setMatch($match) {
+	public function setUrl($url) {
 
-		$this->_match = (string) $match;
+		$this->_url = (string) $url;
 
 		return $this;
-
-	}
-
-	public function getMatch() {
-
-		return (string) $this->_match;
-
-	}
-
-	public function setRequest(Yab_Controller_Request $request) {
-
-		$this->_request = $request;
-
-		return $this;
-
-	}
-
-	public function getRequest() {
-
-		return $this->_request;
 
 	}
 
@@ -72,9 +45,11 @@ class Yab_Helper_Menu {
 
 	}
 
-	public function getLabel() {
+	public function setMatch($match) {
 
-	return (string) $this->_label;
+		$this->_match = (string) $match;
+
+		return $this;
 
 	}
 
@@ -86,17 +61,35 @@ class Yab_Helper_Menu {
 
 	}
 
-	public function getVisible() {
-
-		return (bool) $this->_visible;
-
-	}
-
 	public function setChilds(array $childs) {
 
 		$this->_childs = $childs;
 
 		return $this;
+
+	}
+
+	public function getUrl() {
+
+		return (string) $this->_url;
+
+	}
+
+	public function getLabel() {
+
+		return (string) $this->_label;
+
+	}
+
+	public function getMatch() {
+
+		return (string) $this->_match;
+
+	}
+
+	public function getVisible() {
+
+		return (bool) $this->_visible;
 
 	}
 
@@ -106,34 +99,29 @@ class Yab_Helper_Menu {
 
 	}
 
-	protected function match(Yab_Controller_Request $request) {
+	public function addChild($url = null, $label = null, $match = null, $visible = true) {
 
-		if(!$this->_visible)
-			return false;
+		$menu = new Yab_Helper_Menu($url, $label, $match, $visible);
+	
+		array_push($this->_childs, $menu);
 
-		if(((string) $request) == ((string) $this->_request))
-			return true;
-
-		if($this->_match && preg_match($this->_match, (string) $request))
-			return true;
-
-		return false;
+		return $menu;
 
 	}
 
-	public function getChild(Yab_Controller_Request $request, $depth = 0, $current_depth = 0) {
+	public function getChild($url, $depth = 0, $current_depth = 0) {
 
 		if($depth && $depth <= $current_depth)
-			throw new Yab_Exception($request.' is not an existing child "'.$depth.' <= '.$current_depth.'"');
+			throw new Yab_Exception($url.' is not an existing child "'.$depth.' <= '.$current_depth.'"');
 
-		if($this->_visible && ((string) $request) == ((string) $this->_request))
+		if($this->_visible && ((string) $url) == ((string) $this->_url))
 			return $this;
 
 		foreach($this->_childs as $child) {
 
 			try {
 
-				return $child->getChild($request, $depth, $current_depth + 1);
+				return $child->getChild($url, $depth, $current_depth + 1);
 
 			} catch(Yab_Exception $e) {
 
@@ -143,14 +131,29 @@ class Yab_Helper_Menu {
 
 		}
 
-		if($this->_visible && $this->_match && preg_match($this->_match, (string) $request))
+		if($this->_visible && $this->_match && preg_match($this->_match, (string) $url))
 			return $this;
 
-		throw new Yab_Exception($request.' is not an existing child "no more childs"');
+		throw new Yab_Exception($url.' is not an existing child "no more childs"');
 
 	}
 
-	public function getHtml(Yab_Controller_Request $request, $depth = 0, $current_depth = 0, $first = true) {
+	protected function _match($url) {
+
+		if(!$this->_visible)
+			return false;
+
+		if(((string) $url) == ((string) $this->_url))
+			return true;
+
+		if($this->_match && preg_match($this->_match, (string) $url))
+			return true;
+
+		return false;
+
+	}
+
+	public function getHtml($url = '', $depth = 0, $current_depth = 0, $first = true) {
 
 		$html = '';
 
@@ -158,23 +161,31 @@ class Yab_Helper_Menu {
 			return $html;
 
 		if($this->_label)
-			$html .= '<a href="'.$this->_request.'"'.(!$current_depth ? ' class="navigation_title"' : '').'>'.$this->_label.'</a>';
+			$html .= '<a href="'.$this->_url.'"'.(!$current_depth ? ' class="navigation_title"' : '').'>'.$this->_label.'</a>';
 
 		if($depth && $depth <= $current_depth)
 			return $html;
 
 		if(count($this->_childs)) {
 
-			$html .= PHP_EOL.'<ul>'.PHP_EOL;
+			$html .= PHP_EOL.'<ul class="depth'.$current_depth.'">'.PHP_EOL;
 
 			foreach($this->_childs as $child) {
 
-				$child_html = $child->getHtml($request, $depth, $current_depth + 1, $first);
+				$child_html = $child->getHtml($url, $depth, $current_depth + 1, $first);
 
-				if(!$child_html)
+				if(!$child_html) 
 					continue;
 
-				$html .= "\t".'<li class="'.$child->getRequest()->getController().' '.$child->getRequest()->getAction().($child->match($request) ? ' selected' : '').($first ? ' first' : '').'">'.$child_html.'</li>'.PHP_EOL;
+				$classes = array();
+				
+				if($child->_match($url))
+					array_push($classes, 'selected');
+				
+				if($first)
+					array_push($classes, 'first');
+					
+				$html .= "\t".'<li'.(count($classes) ? ' class="'.implode(' ', $classes).'"' : '').'>'.$child_html.'</li>'.PHP_EOL;
 
 				$first = false;
 
@@ -182,8 +193,8 @@ class Yab_Helper_Menu {
 
 			$html .= '</ul>'.PHP_EOL;
 
-		}
-
+		} 
+		
 		return $html;
 
 	}
