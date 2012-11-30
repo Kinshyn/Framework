@@ -12,22 +12,14 @@
 
 class Yab_Helper_Menu {
 
+	protected $_parent = null;
+	
 	protected $_url = null;
 	protected $_match = null;
 	protected $_label = null;
 	protected $_visible = true;
 	
 	protected $_childs = array();
-
-	public function __construct($url = null, $label = null, $match = null, $visible = true, array $childs = array()) {
-
-		$this->setUrl($url);
-		$this->setLabel($label);
-		$this->setMatch($match);
-		$this->setVisible($visible);
-		$this->setChilds($childs);
-
-	}
 
 	public function setUrl($url) {
 
@@ -56,14 +48,6 @@ class Yab_Helper_Menu {
 	public function setVisible($visible) {
 
 		$this->_visible = (bool) $visible;
-
-		return $this;
-
-	}
-
-	public function setChilds(array $childs) {
-
-		$this->_childs = $childs;
 
 		return $this;
 
@@ -101,8 +85,15 @@ class Yab_Helper_Menu {
 
 	public function addChild($url = null, $label = null, $match = null, $visible = true) {
 
-		$menu = new Yab_Helper_Menu($url, $label, $match, $visible);
-	
+		$menu = new Yab_Helper_Menu();
+		
+		$menu->setUrl($url);
+		$menu->setLabel($label);
+		$menu->setMatch($match);
+		$menu->setVisible($visible);
+		
+		$menu->_parent = $this;
+		
 		array_push($this->_childs, $menu);
 
 		return $menu;
@@ -138,6 +129,15 @@ class Yab_Helper_Menu {
 
 	}
 
+	public function getParent() {
+
+		if($this->_parent instanceof Yab_Helper_Menu)
+			return $this->_parent;
+
+		throw new Yab_Exception('"'.$this->_url.'" does not have any parent');
+
+	}
+
 	protected function _match($url) {
 
 		if(!$this->_visible)
@@ -170,21 +170,21 @@ class Yab_Helper_Menu {
 
 			$html .= PHP_EOL.'<ul class="depth'.$current_depth.'">'.PHP_EOL;
 
-			foreach($this->_childs as $child) {
+			foreach($this->_childs as $i => $child) {
 
 				$child_html = $child->getHtml($url, $depth, $current_depth + 1, $first);
 
-				if(!$child_html) 
+				if(!$child_html)
 					continue;
 
-				$classes = array();
-				
+				$classes = array('child'.$i);
+
 				if($child->_match($url))
 					array_push($classes, 'selected');
-				
+
 				if($first)
 					array_push($classes, 'first');
-					
+
 				$html .= "\t".'<li'.(count($classes) ? ' class="'.implode(' ', $classes).'"' : '').'>'.$child_html.'</li>'.PHP_EOL;
 
 				$first = false;
@@ -194,7 +194,7 @@ class Yab_Helper_Menu {
 			$html .= '</ul>'.PHP_EOL;
 
 		} 
-		
+
 		return $html;
 
 	}
