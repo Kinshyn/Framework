@@ -406,9 +406,9 @@ class Yab_Loader {
     
 	}
 
-	final public function getRequest($controller = null, $action = null, array $params = array()) {
-
-		if(!$controller) {
+	final public function getRequest($controller_or_uri = null, $action = null, array $params = array()) {
+	
+		if(!$controller_or_uri) {
 
 			$request = self::getInstance('Yab_Controller_Request', array(true));
 
@@ -425,15 +425,24 @@ class Yab_Loader {
 
 		}
 
-		if(!$action)
-			$action = $this->getRouter()->getDefaultAction();
-
 		$request = new Yab_Controller_Request();
-		
-		$request->setBaseUrl($this->getRequest()->getBaseUrl())
-				->setController($controller)
-				->setAction($action)
-				->setParams($params);
+
+		if(preg_match('#/\-\.#', $controller_or_uri)) {
+			
+			$request->setBaseUrl($this->getRequest()->getBaseUrl())
+					->setUri($controller_or_uri);
+			
+		} else {
+
+			if(!$action)
+				$action = $this->getRouter()->getDefaultAction();
+			
+			$request->setBaseUrl($this->getRequest()->getBaseUrl())
+					->setController($controller_or_uri)
+					->setAction($action)
+					->setParams($params);
+					
+		}
 
 		$this->getRouter()->route($request);
 
