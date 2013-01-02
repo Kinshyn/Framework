@@ -17,11 +17,12 @@ class Yab_Db_Adapter_Sybase extends Yab_Db_Adapter_Abstract {
 	private $_host = null;
 	private $_login = null;
 	private $_password = null;
+	private $_appname = null;
 
 	private $_tmp_tables = array();
 	private $_selected_schema = array();
 
-	public function construct($host = null, $login = null, $password = null, $encoding = null, $schema = null) {
+	public function __construct($host = null, $login = null, $password = null, $encoding = null, $schema = null, $appname = null) {
 
 		if($host)
 			$this->setHost($host);
@@ -37,6 +38,9 @@ class Yab_Db_Adapter_Sybase extends Yab_Db_Adapter_Abstract {
 
 		if($schema)
 			$this->setSchema($schema);
+
+		if($appname)
+			$this->setAppname($appname);
 
 	}
 	
@@ -63,6 +67,14 @@ class Yab_Db_Adapter_Sybase extends Yab_Db_Adapter_Abstract {
 		return $this;
 	
 	}
+	
+	public function setAppname($appname) {
+	
+		$this->_appname = (string) $appname;
+		
+		return $this;
+	
+	}
 
 	public function isConnected() {
 
@@ -84,9 +96,6 @@ class Yab_Db_Adapter_Sybase extends Yab_Db_Adapter_Abstract {
 
 	public function free($rowset) {
 
-		if(!is_resource($rowset))
-			return false;
-			
 		return sybase_free_result($rowset);
 
 	}
@@ -326,7 +335,7 @@ class Yab_Db_Adapter_Sybase extends Yab_Db_Adapter_Abstract {
 
 	protected function _connect() {
 
-		$this->_connexion = @sybase_connect($this->_host, $this->_login, $this->_password, $this->_encoding);
+		$this->_connexion = @sybase_connect($this->_host, $this->_login, $this->_password, $this->_encoding, $this->_appname);
 
 		if(!$this->isConnected())
 			throw new Yab_Exception('can not connect to sybase server with this host, login, password');
