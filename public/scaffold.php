@@ -14,6 +14,8 @@ try {
 	
 	$scaffolder = new Yab_Scaffolder($db, $root.'scaffold');
 	
+	$scaffolder->set('model_cache_column', false);
+	
 	$scaffolder->scaffold();
 		
 } catch(Yab_Exception $e) {
