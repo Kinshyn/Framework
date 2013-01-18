@@ -21,7 +21,7 @@ class Yab_Db_Adapter_Oracle extends Yab_Db_Adapter_Abstract {
 	private $_tmp_tables = array();
 	private $_selected_schema = array();
 
-	public function __construct($host = null, $login = null, $password = null, $encoding = null, $schema = null) {
+	public function construct($host = null, $login = null, $password = null, $encoding = null, $schema = null) {
 
 		if($host)
 			$this->setHost($host);
