@@ -97,6 +97,8 @@ class Yab_Db_Adapter_Pdo_Mysql extends Yab_Db_Adapter_Abstract {
 		if(!($rowset instanceof PDOStatement))
 			throw new Yab_Exception('rowset must be an instance of PDOStatement');
 
+		$rowset->rewind();
+
 		for($i = 0; $i < $offset; $i++)
 			$rowset->fetch();
 			
@@ -257,6 +259,8 @@ class Yab_Db_Adapter_Pdo_Mysql extends Yab_Db_Adapter_Abstract {
 	protected function _query($sql) {
 
 		$statement = $this->_pdo->prepare($sql);
+		
+		$statement->setAttribute(PDO_MYSQL_ATTR_USE_BUFFERED_QUERY, 1);
 		
 		$statement->execute();
 	
