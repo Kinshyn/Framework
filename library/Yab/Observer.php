@@ -17,6 +17,14 @@ class Yab_Observer {
 
 	private $_events = array();
 	
+	public function clearEvent($event) {
+		
+		$this->_events[$event] = array();
+		
+		return $this;
+		
+	}
+	
 	public function notify($event, array $params = array()) {
 
 		if($event != self::NOTIFY)
