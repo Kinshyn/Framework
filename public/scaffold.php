@@ -12,7 +12,11 @@ try {
 
 	$db = $loader->getRegistry()->get('db');
 	
-	$scaffolder = new Yab_Scaffolder($db, $root.'scaffold');
+	$scaffolder = new Yab_Scaffolder();
+	
+	$scaffolder->setDb($db);
+	
+	$scaffolder->setDirectory($root.'application');
 	
 	$scaffolder->set('model_cache_column', false);
 	
