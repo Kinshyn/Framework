@@ -65,6 +65,12 @@ class Yab_Form extends Yab_Object {
 
 		$errors = array();
 
+		if($this->_csrf && !$this->_csrf->isSubmitted()) 
+			return $errors;
+					
+		if($this->_csrf && !$this->_csrf->isValid()) 
+			return $errors;
+
 		if($this->isSubmitted()) {
 		
 			foreach($this->_elements as $element) {
@@ -97,7 +103,7 @@ class Yab_Form extends Yab_Object {
 		$session = Yab_Loader::getInstance()->getSession();	
 		
 		$csrf_name = 'yab_'.$token.'_csrf_token';
-		$csrf_value = md5(uniqid($token, true).$csrf_name.$request->getServer('REMOTE_ADDR').$request->getServer('HTTP_USER_AGENT'));
+		$csrf_value = md5($csrf_name.$request->getServer()->get('REMOTE_ADDR').$request->getServer()->get('HTTP_USER_AGENT'));
 
 		if(!$session->has($csrf_name))
 			$session->set($csrf_name, $csrf_value);
