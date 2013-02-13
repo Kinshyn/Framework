@@ -18,6 +18,7 @@ class Yab_Smtp extends Yab_Socket {
 	private $_password = null;
 
 	private $_dkim = array();
+	private $_domain_key = array();
 
 	public function auth($login, $password) {
 
@@ -130,10 +131,7 @@ class Yab_Smtp extends Yab_Socket {
 	
 		$headers_position = strpos($data, self::CRLF.self::CRLF);
 
-		if(!is_numeric($headers_position)) 
-			return array();
-
-		return substr($data, 0, $headers_position);
+		return is_numeric($headers_position) ? substr($data, 0, $headers_position) : $data;
 
 	}
 	
@@ -197,14 +195,22 @@ class Yab_Smtp extends Yab_Socket {
 		$this->_command('RCPT TO:'.$to);
 		$this->_command('DATA');
 
-		$data = $this->signDkim($data);
+		$domain_key = $this->getDomainKey($data);
+
+		if($domain_key)
+			$data = $domain_key.self::CRLF.$data;
+
+		$dkim = $this->getDkim($data);
+
+		if($dkim)
+			$data = $dkim.self::CRLF.$data;
 
 		$data = str_replace("\n.", "\n..", $data);
 		$data = str_replace("\r.", "\r..", $data);
 
 		if(substr($data, 0, 1) == '.')
 			$data = '.'.$data;
-		
+
 		$data = $data.self::CRLF.'.';
 
 		$this->_command($data);
@@ -252,83 +258,171 @@ class Yab_Smtp extends Yab_Socket {
 
 	}
 
-	public function setDkim($domain, $selector, $private_key) {
+	public function setDkim($domain, $selector, $private_key, $passphrase = '', $body_canonicalization = 'relaxed', array $signed_headers = array('mime-version', 'from', 'to', 'subject', 'reply-to')) {
 
-		$this->_dkim['domain'] = $domain;
-		$this->_dkim['selector'] = $selector;
-		$this->_dkim['private_key'] = $private_key;
-
+		if(!function_exists('openssl_pkey_get_private'))
+			throw new Yab_Exception('Can not use DKIM if the PHP openssl extension is not active');
+	
+		$this->_dkim['domain'] = (string) $domain;
+		$this->_dkim['selector'] = (string) $selector;
+		$this->_dkim['private_key'] = openssl_pkey_get_private($private_key, $passphrase);
+		$this->_dkim['body_canonicalization'] = (string) $body_canonicalization;
+		$this->_dkim['signed_headers'] = array_map('strtolower', $signed_headers);
+		
 		return $this;
 
 	}
 
-	public function signDkim($data) {
+	public function getDkim($data) {
+
+		if(!function_exists('openssl_sign'))
+			throw new Yab_Exception('Can not use DKIM if the PHP openssl extension is not active');
 
 		if(!count($this->_dkim))
-			return $data;
+			return '';
+
+		if(!in_array($this->_dkim['body_canonicalization'], array('relaxed', 'simple')))
+			throw new Yab_Exception('Can not use DKIM with body_canonicalization "'.$this->_dkim['body_canonicalization'].'"');
 
 		$body = $this->extractBody($data);
 		$headers = $this->extractHeaders($data);
 		
 		$dkim_headers = $this->splitHeaders($data);
 
-		if(array_key_exists('return-path', $dkim_headers))
-			unset($dkim_headers['return-path']);
-		
-		if(array_key_exists('subject', $dkim_headers))
-			unset($dkim_headers['subject']);
-			
 		foreach($dkim_headers as $key => $value)
-			if(preg_match('#^X\-#i', $key))
+			if(!in_array(strtolower($key), $this->_dkim['signed_headers']))
 				unset($dkim_headers[$key]);
+		
+		if(in_array($this->_dkim['body_canonicalization'], array('relaxed'))) {
+		
+			$lines = explode(self::CRLF, $body);
+			
+			foreach($lines as $key => $value)
+				$lines[$key] = preg_replace('#\s+#', ' ', rtrim($value));
 
-		while(substr($body, strlen($body) - strlen(self::CRLF.self::CRLF), strlen(self::CRLF.self::CRLF)) == self::CRLF.self::CRLF)
-			$body = substr($body, 0, strlen($body) - strlen(self::CRLF));
+			$body = implode(self::CRLF, $lines);
 
-		$dkim = "v=1; a=rsa-sha1; q=dns/txt; s=".$this->_dkim['selector']."; c=relaxed/simple;".self::CRLF.
-		"\tl=".strlen($body)."; t=".time()."; x=".(time() +  10200)."; h=".implode(':', array_map('strtolower', array_map('trim', array_keys($dkim_headers)))).";".self::CRLF.
-		"\td=".ltrim($this->_dkim['domain'], '@')."; bh=".base64_encode(pack("H*", sha1($body))).";".self::CRLF.
-		"\tb=";
+		}
+		
+		if(in_array($this->_dkim['body_canonicalization'], array('relaxed', 'simple'))) {
+
+			while(substr($body, strlen($body) - strlen(self::CRLF.self::CRLF), strlen(self::CRLF.self::CRLF)) == self::CRLF.self::CRLF)
+				$body = substr($body, 0, strlen($body) - strlen(self::CRLF));
+
+			if(substr($body, strlen($body) - strlen(self::CRLF), strlen(self::CRLF)) != self::CRLF)
+				$body .= self::CRLF;
+		
+		}
+
+		$dkim = 'DKIM-Signature:'.self::CRLF;
+		$dkim .= "\t".'v=1;'.self::CRLF;
+		$dkim .= "\t".'a=rsa-sha1;'.self::CRLF;
+		$dkim .= "\t".'q=dns/txt;'.self::CRLF;
+		$dkim .= "\t".'s='.$this->_dkim['selector'].';'.self::CRLF;
+		$dkim .= "\t".'c=relaxed/'.$this->_dkim['body_canonicalization'].';'.self::CRLF;
+		$dkim .= "\t".'l='.strlen($body).';'.self::CRLF;
+		$dkim .= "\t".'t='.time().';'.self::CRLF;
+		$dkim .= "\t".'x='.(time() +  10200).';'.self::CRLF;
+		$dkim .= "\t".'h='.implode(':', array_map('strtolower', array_map('trim', array_keys($dkim_headers)))).';'.self::CRLF;
+		$dkim .= "\t".'d='.ltrim($this->_dkim['domain'], '@').';'.self::CRLF;
+		$dkim .= "\t".'bh='.rtrim(chunk_split(base64_encode(pack("H*", sha1($body))), 64, self::CRLF."\t")).';'.self::CRLF;
+		$dkim .= "\t".'b=';
 
 		$relaxed_headers = '';
 		
 		foreach($dkim_headers as $key => $value) 
 			$relaxed_headers .= trim(strtolower($key)).':'.trim(preg_replace("#\s+#", " ", $value)).self::CRLF;
 
-		$relaxed_headers .= 'dkim-signature:'.trim(preg_replace("#\s+#", " ", $dkim));
+		foreach($this->splitHeaders($dkim) as $key => $value)
+			$relaxed_headers .= trim(strtolower($key)).':'.trim(preg_replace("#\s+#", " ", $value));
 
-		openssl_sign($relaxed_headers, $signature, $this->_dkim['private_key']);
+		if(!openssl_sign($relaxed_headers, $signature, $this->_dkim['private_key']))
+			return '';
 
-		return $headers.self::CRLF.'DKIM-Signature: '.$dkim.base64_encode($signature).self::CRLF.self::CRLF.$body;
+		return $dkim.rtrim(chunk_split(base64_encode($signature), 64, self::CRLF."\t"));
 
 	}
 
-	public function setDomainKey($domain, $selector, $private_key) {
+	public function setDomainKey($domain, $selector, $private_key, $passphrase = '', $canonicalization = 'nofws', array $signed_headers = array('mime-version', 'from', 'to', 'subject', 'reply-to')) {
 
-		$this->_dk['domain'] = $domain;
-		$this->_dk['selector'] = $selector;
-		$this->_dk['private_key'] = $private_key;
+		if(!function_exists('openssl_pkey_get_private'))
+			throw new Yab_Exception('Can not use DKIM if the PHP openssl extension is not active');
+
+		$this->_domain_key['domain'] = (string) $domain;
+		$this->_domain_key['selector'] = (string) $selector;
+		$this->_domain_key['private_key'] = openssl_pkey_get_private($private_key, $passphrase);
+		$this->_domain_key['canonicalization'] = (string) $canonicalization;
+		$this->_domain_key['signed_headers'] = array_map('strtolower', $signed_headers);
 
 		return $this;
 
 	}
 
-	public function signDomainKey($data) {
+	public function getDomainKey($data) {
 
-		if(!count($this->_dk))
-			return $data;
+		if(!function_exists('openssl_sign'))
+			throw new Yab_Exception('Can not use DKIM if the PHP openssl extension is not active');
+
+		if(!count($this->_domain_key))
+			return '';
+
+		if(!in_array($this->_domain_key['canonicalization'], array('nofws', 'simple')))
+			throw new Yab_Exception('Can not use DKIM with canonicalization "'.$this->_domain_key['canonicalization'].'"');
 
 		$body = $this->extractBody($data);
-		$headers = $this->extractHeaders($data);
+		$headers = $this->extractHeaders($data, true);
+		
+		$dk_headers = $this->splitHeaders($data);
 
-		$dk = "a=rsa-sha1; s=".$this->_dk['selector']."; d=".ltrim($this->_dk['domain'], '@')."; q=dns;".self::CRLF."\tb=";
+		foreach($dk_headers as $key => $value)
+			if(!in_array(strtolower($key), $this->_domain_key['signed_headers']))
+				unset($dk_headers[$key]);
+		
+		$domain_key = 'DomainKey-Signature:'.self::CRLF;
+		$domain_key .= "\t".'a=rsa-sha1;'.self::CRLF;
+		$domain_key .= "\t".'c='.$this->_domain_key['canonicalization'].';'.self::CRLF;
+		$domain_key .= "\t".'d='.ltrim($this->_domain_key['domain'], '@').';'.self::CRLF;
+		$domain_key .= "\t".'s='.$this->_domain_key['selector'].';'.self::CRLF;
+		$domain_key .= "\t".'h='.implode(':', array_map('strtolower', array_map('trim', array_keys($dk_headers)))).';'.self::CRLF;
+		$domain_key .= "\t".'b=';
+		
+		if(in_array($this->_domain_key['canonicalization'], array('nofws'))) {
 
-		openssl_sign($data, $signature, $this->_dk['private_key']);
+			$data = '';
+		
+			foreach($dk_headers as $key => $value)
+				$data .= preg_replace("/\s/", '', preg_replace("/\r\n\s+/", " ", $key.':'.$value)).self::CRLF;
 
-		return $headers.self::CRLF.'DomainKey-Signature: '.$dk.base64_encode($signature).self::CRLF.self::CRLF.$body;
+			$lines = explode(self::CRLF, $body);
+			
+			foreach($lines as $key => $line)
+				$lines[$key] = preg_replace("/\s/", '', $line);
+
+			$body = rtrim(implode(self::CRLF, $lines)).self::CRLF;
+			
+			$data .= self::CRLF.$body;
+			
+		} elseif(in_array($this->_domain_key['canonicalization'], array('simple'))) {
+
+			$data = '';
+
+			foreach($dk_headers as $key => $value) 
+				$data .= $key.':'.$value.self::CRLF;
+
+			$data .= self::CRLF.$body.self::CRLF;
+			
+			while(substr($data, strlen($data) - strlen(self::CRLF.self::CRLF), strlen(self::CRLF.self::CRLF)) == self::CRLF.self::CRLF)
+				$data = substr($data, 0, strlen($data) - strlen(self::CRLF));			
+
+		}
+		
+		if(!openssl_sign($data, $signature, $this->_domain_key['private_key'], OPENSSL_ALGO_SHA1))
+			return '';
+
+		return $domain_key.rtrim(chunk_split(base64_encode($signature), 64, self::CRLF."\t"));
 
 	}
-
+	
 }
 
 // Do not clause PHP tags unless it is really necessary
