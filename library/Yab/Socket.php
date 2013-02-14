@@ -22,23 +22,61 @@ class Yab_Socket {
 
 	private $_client = null;
 
-	public function __construct($address, $port, $socket = null) {
+	protected $_socket_domain = AF_INET;
+	protected $_socket_type = SOCK_STREAM;
+	protected $_socket_protocol = SOL_TCP;
+	
+	final public function __construct($address, $port, $socket = null) {
 	
 		$this->_address = (string) $address;
 		$this->_port = (int) $port;
 		
-		if($socket) {
+		if(is_resource($socket)) {
 		
 			$this->_socket = $socket;
 			
 			$this->_client = true;
 			
-		} else {
-			
-			$this->_socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
-			
 		}
 
+	}
+	
+	private function _resource() {
+	
+		if(is_resource($this->_socket))
+			return $this->_socket;
+		
+		socket_create($this->_socket_domain, $this->_socket_type, $this->_socket_protocol);
+		
+		if(is_resource($this->_socket))
+			throw new Yab_Exception('can not create socket');
+			
+		return $this->_socket;
+	
+	}
+	
+	public function setDomain($domain) {
+	
+		$this->_socket_domain = (int) $domain;
+		
+		return $this;
+	
+	}
+	
+	public function setType($type) {
+	
+		$this->_socket_type = (int) $type;
+		
+		return $this;
+	
+	}
+	
+	public function setProtocol($protocol) {
+	
+		$this->_socket_protocol = (int) $protocol;
+		
+		return $this;
+	
 	}
 
 	public function getAddress() {
@@ -60,7 +98,7 @@ class Yab_Socket {
 		if($this->_client !== true)
 			throw new Yab_Exception('can not write on a server socket');
 	
-		$stream = @socket_read($this->_socket, 4096);
+		$stream = @socket_read($this->_resource(), 4096);
 	
 		if($stream === false)
 			throw new Yab_Exception('can not read on socket,  '.$this->error());
@@ -80,7 +118,7 @@ class Yab_Socket {
 
 		$length = strlen($stream);
 		
-		$written = @socket_write($this->_socket, $stream, $length);
+		$written = @socket_write($this->_resource(), $stream, $length);
 		
 		if($written < $length)
 			throw new Yab_Exception('can not fully write on socket, '.$this->error());
@@ -122,15 +160,15 @@ class Yab_Socket {
 		if(is_numeric($max_clients))
 			$this->_max_clients = $max_clients;
 			
-		if(!socket_bind($this->_socket, $this->_address, $this->_port))
+		if(!socket_bind($this->_resource(), $this->_address, $this->_port))
 			throw new Yab_Exception('can not bind socket to "'.$this->_address.':'.$this->_port.'" '.$this->error());
 		
-		if(!socket_listen($this->_socket))
+		if(!socket_listen($this->_resource()))
 			throw new Yab_Exception('can not listen socket '.$this->error());
 		
 		while(true) {
 		
-			$client = socket_accept($this->_socket);
+			$client = socket_accept($this->_resource());
 
 			$address = null;
 			$port = null;
@@ -210,7 +248,7 @@ class Yab_Socket {
 
 	public function error() {
 	
-		$int = socket_last_error($this->_socket);
+		$int = socket_last_error($this->_resource());
 		
 		$str = socket_strerror($int);
 		
@@ -225,10 +263,10 @@ class Yab_Socket {
 	
 		$this->_client = true;
 			
-		if(!socket_bind($this->_socket, $this->_address))
+		if(!socket_bind($this->_resource(), $this->_address))
 			throw new Yab_Exception('can not bind socket to "'.$this->_address.'" '.$this->error());
 		
-		if(!socket_connect($this->_socket, $this->_address, $this->_port))
+		if(!socket_connect($this->_resource(), $this->_address, $this->_port))
 			throw new Yab_Exception('can not connect socket to "'.$this->_address.':'.$this->_port.'" '.$this->error());
 		
 		$this->_onConnect();
@@ -239,10 +277,10 @@ class Yab_Socket {
 	
 	private function _close() {
 		
-		if(!is_resource($this->_socket))
+		if(!is_resource($this->_resource()))
 			return $this;
 			
-		socket_close($this->_socket);
+		socket_close($this->_resource());
 		
 		return $this;
 	
