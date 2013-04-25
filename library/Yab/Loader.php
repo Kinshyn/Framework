@@ -274,9 +274,25 @@ class Yab_Loader {
 		
 		$space = $is_cli ? ' ' : '&nbsp;';
 		$crlf = $is_cli ? PHP_EOL : '<br />';
-		$label = $label ? '['.$label.']'.$space : '';
+		
+		if($label === null) {
+		
+			$bt = debug_backtrace();
 
-		$benchmark = $label.'Length:'.$space.$this->getScriptLength(3).$space.'sec,'.$space.'Memory:'.$space.number_format($this->getMemoryUsage() / 1024 / 1024, 2).$space.'Mo,'.$space.'Peak:'.$space.number_format($this->getMemoryPeakUsage() / 1024 / 1024, 2).$space.'Mo'.$crlf;
+			$last_bt = array_shift($bt);
+
+			if($last_bt['file'] == __FILE__)
+				$last_bt = array_shift($bt);
+			
+			$label = '['.$last_bt['file'].':L'.$last_bt['line'].']';
+		
+		} else {
+		
+			$label = '['.$label.']';
+		
+		}
+
+		$benchmark = $label.$space.'Length:'.$space.$this->getScriptLength(3).$space.'sec,'.$space.'Memory:'.$space.number_format($this->getMemoryUsage() / 1024 / 1024, 2).$space.'Mo,'.$space.'Peak:'.$space.number_format($this->getMemoryPeakUsage() / 1024 / 1024, 2).$space.'Mo'.$crlf;
 
 		return $benchmark;
 
@@ -427,21 +443,18 @@ class Yab_Loader {
 
 		$request = new Yab_Controller_Request();
 
-		if(preg_match('#/\-\.#', $controller_or_uri)) {
+		if(!$action) {
 			
 			$request->setBaseUrl($this->getRequest()->getBaseUrl())
 					->setUri($controller_or_uri);
-			
+
 		} else {
 
-			if(!$action)
-				$action = $this->getRouter()->getDefaultAction();
-			
 			$request->setBaseUrl($this->getRequest()->getBaseUrl())
 					->setController($controller_or_uri)
 					->setAction($action)
 					->setParams($params);
-					
+
 		}
 
 		$this->getRouter()->route($request);

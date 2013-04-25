@@ -46,9 +46,9 @@ class Yab_Socket {
 		if(is_resource($this->_socket))
 			return $this->_socket;
 		
-		socket_create($this->_socket_domain, $this->_socket_type, $this->_socket_protocol);
+		$this->_socket = socket_create($this->_socket_domain, $this->_socket_type, $this->_socket_protocol);
 		
-		if(is_resource($this->_socket))
+		if(!is_resource($this->_socket))
 			throw new Yab_Exception('can not create socket');
 			
 		return $this->_socket;
@@ -246,6 +246,15 @@ class Yab_Socket {
 	
 	}
 
+	public function bind($address) {
+			
+		if(!socket_bind($this->_resource(), $address))
+			throw new Yab_Exception('can not bind socket to "'.$address.'" '.$this->error());
+		
+		return $this;
+	
+	}
+
 	public function error() {
 	
 		$int = socket_last_error($this->_resource());
@@ -262,12 +271,9 @@ class Yab_Socket {
 			return $this;
 	
 		$this->_client = true;
-			
-		if(!socket_bind($this->_resource(), $this->_address))
-			throw new Yab_Exception('can not bind socket to "'.$this->_address.'" '.$this->error());
-		
-		if(!socket_connect($this->_resource(), $this->_address, $this->_port))
-			throw new Yab_Exception('can not connect socket to "'.$this->_address.':'.$this->_port.'" '.$this->error());
+
+		if(!@socket_connect($this->_resource(), $this->_address, $this->_port))
+			throw new Yab_Exception('can not connect socket to "'.$this->_address.'" on port "'.$this->_port.'"');
 		
 		$this->_onConnect();
 		

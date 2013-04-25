@@ -78,10 +78,19 @@ class Yab_Helper_Pager {
 
 		$this->_export();
 
-		if($sql_limit)
-			return $statement->sqlLimit(($this->getCurrentPage() - 1) * $this->getPerPage(), $this->getPerPage());		
+		if($sql_limit) {
 
-		$this->_total = count($statement->query());
+			$current_page = $this->getCurrentPage();
+
+			$per_page = $this->getPerPage();
+	
+			return $statement->sqlLimit(($current_page - 1) * $per_page, $per_page);		
+			
+		}
+		
+		$statement->query();
+		
+		$this->_total = count($statement);
 
 		return $statement->limit(($this->getCurrentPage() - 1) * $this->getPerPage(), $this->getPerPage());		
 
@@ -452,10 +461,10 @@ class Yab_Helper_Pager {
 			$this->_session->set($this->_prefix.$key, $this->_request->getRequest()->get($this->_prefix.$key));
 			
 		}
-
+		
 		if($this->_session->has($this->_prefix.$key))
 			return $this->_session->get($this->_prefix.$key);
-			
+
 		return $default;
 	
 	}

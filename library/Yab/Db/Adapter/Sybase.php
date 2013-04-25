@@ -162,16 +162,12 @@ class Yab_Db_Adapter_Sybase extends Yab_Db_Adapter_Abstract {
 		while($row = $this->fetch($rowset)) {
 
 			if(!array_key_exists('index_keys', $row))
-				continue;
+				continue;   
 
-			foreach(explode(',', $row['index_keys']) as $index_key) {
+			$indexes[$row['index_name']] = array_map('trim', explode(',', $row['index_keys']));
 
-				array_push($indexes, trim($index_key));
-
-				if(is_numeric(strpos($row['index_description'], 'unique')))
-					array_push($uniques, trim($index_key));
-
-			}
+			if(is_numeric(strpos($row['index_description'], 'unique')))
+				$uniques[$row['index_name']] = array_map('trim', explode(',', $row['index_keys']));
 
 		}
 
@@ -179,12 +175,17 @@ class Yab_Db_Adapter_Sybase extends Yab_Db_Adapter_Abstract {
 
 		$rowset = $this->query('sp_columns '.$this->quoteIdentifier($table));
 
+		$has_primary = false;
+
 		while($row = $this->fetch($rowset)) {
 
 			$column = new Yab_Db_Table_Column($table, trim($row['column_name']));
 
-			$column->setPrimary(is_numeric(strpos($row['type_name'], 'identity')));
-			$column->setUnique($column->getPrimary());
+			$primary = is_numeric(strpos($row['type_name'], 'identity'));
+
+			$has_primary |= $primary;
+
+			$column->setPrimary($primary);
 			$column->setUnsigned(true);
 			$column->setSequence($column->getPrimary());
 			$column->setNull($row['is_nullable'] == 'YES');
@@ -192,17 +193,31 @@ class Yab_Db_Adapter_Sybase extends Yab_Db_Adapter_Abstract {
 			$column->setNumber(count($columns));
 			$column->setQuotable(!preg_match('#(numeric|int|float)#is', $row['type_name']));
 
-			if(in_array($column, $indexes))
-				$column->setIndexed(true);
+			foreach($indexes as $index => $names)
+				if(in_array($column, $names))
+					$column->addIndex($index);
 
-			if(!$column->getUnique() && in_array($column, $uniques))
-				$column->setUnique(true);
+			foreach($uniques as $index => $names)
+				if(!$column->getUnique() && in_array($column, $names))
+					$column->addUnique($index);
 
 			$columns[$row['column_name']] = clone $column;
 
 		}
 
 		$this->free($rowset);
+
+		if(!$has_primary && count($uniques) == 1)    {
+
+			foreach($uniques as $unique => $names) {
+
+				foreach($names as $name)
+					if(array_key_exists($name, $columns))
+						$columns[$name]->setPrimary(true);
+
+			}
+
+		}
 
 		return $columns;
 

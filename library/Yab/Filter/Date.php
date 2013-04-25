@@ -17,6 +17,7 @@ class Yab_Filter_Date extends Yab_Filter_Abstract {
 		setlocale(LC_TIME, array(
 			'fr_FR.utf8',
 			'fr_FR.UTF-8',
+			'fr_FR.UTF-8',
 			'fr_FR.UTF8',
 			'fr_FR',
 		), 'fra');

@@ -457,9 +457,13 @@ class Yab_Db_Table extends Yab_Object {
 
 		} catch(Yab_Exception $e) {}
 
+		$this->_onSet($key, $value);
+		
 		return $this;
 
 	}
+	
+	protected function _onSet($key, $value) {}
 
 	final public function resetPrimary() {
 

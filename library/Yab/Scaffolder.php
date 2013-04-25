@@ -121,7 +121,7 @@ class Yab_Scaffolder extends Yab_Object {
 
 	public function getForeignTable(Yab_Db_Table_Column $column) {
 
-		if(!$column->getIndexed())
+		if(!count($column->getIndexes()))
 			return null;
 
 		if(preg_match('#^id_#', $column->getName()))
@@ -165,22 +165,6 @@ class Yab_Scaffolder extends Yab_Object {
 		$content .= 'class Model_'.$prefix_class.$class.' extends Yab_Db_Table {'.PHP_EOL.PHP_EOL;
 
 		$content .= "\t".'protected $_name = \''.$table->getName().'\';'.PHP_EOL.PHP_EOL;
-
-		if($this->has('model_cache_column') && $this->get('model_cache_column')) {
-
-			$content .= "\t".'protected function _init() {'.PHP_EOL.PHP_EOL;
-
-			foreach($table->getColumns() as $column) {
-
-				$content .= "\t\t".'$column = new Yab_Db_Table_Column($this, \''.$column->getName().'\');'.PHP_EOL;
-				$content .= "\t\t".'$column->setPrimary(\''.$column->getPrimary().'\')->setUnique(\''.$column->getUnique().'\')->setSequence(\''.$column->getSequence().'\')->setNull(\''.$column->getNull().'\')->setUnsigned(\''.$column->getUnsigned().'\')->setDefaultValue(\''.$column->getDefaultValue().'\')->setIndexed(\''.$column->getIndexed().'\')->setNumber(\''.$column->getNumber().'\')->setQuotable(\''.$column->getQuotable().'\')->setType(\''.$column->getType().'\');'.PHP_EOL;	
-				$content .= "\t\t".'$this->addColumn(clone $column, true);'.PHP_EOL.PHP_EOL;		
-
-			}	
-
-			$content .= "\t".'}'.PHP_EOL.PHP_EOL;
-
-		}
 
 		foreach($table->getColumns() as $column) {		
 
@@ -316,7 +300,7 @@ class Yab_Scaffolder extends Yab_Object {
 		$content .= '$pager = new Yab_Helper_Pager($'.$objects.', \'pager_'.$object.'\');'.PHP_EOL.PHP_EOL;
 		$content .= '$'.$objects.' = $pager->getStatement();'.PHP_EOL.PHP_EOL;
 		$content .= '?>'.PHP_EOL.PHP_EOL;
-		$content .= '<table>'.PHP_EOL;
+		$content .= '<table class="table table-striped">'.PHP_EOL;
 		$content .= "\t".'<caption>'.$class.'</caption>'.PHP_EOL;
 		$content .= "\t".'<thead>'.PHP_EOL;
 		$content .= "\t\t".'<tr>'.PHP_EOL;

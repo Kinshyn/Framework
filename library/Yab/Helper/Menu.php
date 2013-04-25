@@ -166,17 +166,21 @@ class Yab_Helper_Menu {
 		if($depth && $depth <= $current_depth)
 			return $html;
 
-		if(count($this->_childs)) {
+		$nb_childs = count($this->_childs);
+			
+		if($nb_childs) {
 
 			$html .= PHP_EOL.'<ul class="depth'.$current_depth.'">'.PHP_EOL;
 
+			$childs = array();
+			
 			foreach($this->_childs as $i => $child) {
 
 				$child_html = $child->getHtml($url, $depth, $current_depth + 1, $first);
 
 				if(!$child_html)
 					continue;
-
+	
 				$classes = array('child'.$i);
 
 				if($child->_match($url))
@@ -185,11 +189,23 @@ class Yab_Helper_Menu {
 				if($first)
 					array_push($classes, 'first');
 
-				$html .= "\t".'<li'.(count($classes) ? ' class="'.implode(' ', $classes).'"' : '').'>'.$child_html.'</li>'.PHP_EOL;
+				array_push($childs, "\t".'<li'.(count($classes) ? ' class="'.implode(' ', $classes).'"' : '').'>'.$child_html.'</li>'.PHP_EOL);
 
 				$first = false;
 
 			}
+			
+			if(1 < count($childs)) {
+			
+				$last_child = array_pop($childs);
+				
+				$last_child = preg_replace('#class="([^"]+)"#', 'class="$1 last"', $last_child);
+				
+				array_push($childs, $last_child);
+			
+			}
+			
+			$html .= implode('', $childs);
 
 			$html .= '</ul>'.PHP_EOL;
 

@@ -164,7 +164,7 @@ class Yab_Db_Adapter_Oracle extends Yab_Db_Adapter_Abstract {
 
 		while($row = $this->fetch($rowset)) {
 
-			$columns[$row['COLUMN_NAME']]->setPrimary(true)->setUnique(true)->setIndexed(true);
+			$columns[$row['COLUMN_NAME']]->setPrimary(true)->addUnique('PRIMARY')->addIndex('PRIMARY');
 
 		}
 

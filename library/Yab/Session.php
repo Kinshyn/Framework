@@ -16,9 +16,17 @@ class Yab_Session extends Yab_Object {
 
 	public function __construct() {
 
-		if(!isset($_SESSION))
-			session_start();
+		try {
+		
+			if(!isset($_SESSION))
+				session_start();
 
+		} catch(Yab_Exception $e) {
+		
+			$_SESSION = array();
+		
+		}
+		
 		$_SESSION[self::SESSION_YAB_KEY] = 1;
 
 		$this->bind($_SESSION);		

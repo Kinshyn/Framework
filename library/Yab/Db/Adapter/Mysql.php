@@ -140,8 +140,8 @@ class Yab_Db_Adapter_Mysql extends Yab_Db_Adapter_Abstract {
 
 			$column = new Yab_Db_Table_Column($table, $row['Field']);
 			$column->setPrimary($row['Key'] == 'PRI');
-			$column->setUnique($row['Key'] == 'PRI' || $row['Key'] == 'UNI');
-			$column->setIndexed((bool) $row['Key']);
+			$column->addUnique($row['Key'] == 'PRI' || $row['Key'] == 'UNI');
+			$column->addIndex($row['Key']);
 			$column->setUnsigned(is_numeric(stripos($row['Type'], 'unsigned')));
 			$column->setSequence($row['Extra'] == 'auto_increment');
 			$column->setNull($row['Null'] == 'YES');

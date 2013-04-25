@@ -13,15 +13,16 @@
 class Yab_Db_Table_Column {
 
 	private $_table = null;
+	
+	private $_uniques = array();
+	private $_indexes = array();
 
 	private $_name = null;
 	private $_primary = false;
-	private $_unique = false;
 	private $_sequence = false;
 	private $_null = false;
 	private $_unsigned = false;
 	private $_default_value = null;
-	private $_indexed = false;
 	private $_number = null;
 	private $_quotable = true;
 	private $_type = null;
@@ -55,9 +56,14 @@ class Yab_Db_Table_Column {
 
 	}
 
-	final public function setUnique($unique) {
+	final public function addUnique($unique) {
 
-		$this->_unique = (bool) $unique;
+		$unique = (string) $unique;
+		
+		if(in_array($unique, $this->_uniques))
+			throw new Yab_Exception('column "'.$this->_name.'" has already an unique constraint named "'.$unique.'"');
+	
+		array_push($this->_uniques, (string) $unique);
 
 		return $this;
 
@@ -95,9 +101,14 @@ class Yab_Db_Table_Column {
 
 	}
 
-	final public function setIndexed($indexed) {
+	final public function addIndex($index) {
 
-		$this->_indexed = (bool) $indexed;
+		$index = (string) $index;
+		
+		if(in_array($index, $this->_indexes))
+			throw new Yab_Exception('column "'.$this->_name.'" has already an index named "'.$index.'"');
+	
+		array_push($this->_indexes, (string) $index);
 
 		return $this;
 
@@ -151,9 +162,9 @@ class Yab_Db_Table_Column {
 
 	}
 
-	final public function getUnique() {
+	final public function getUniques() {
 
-		return (bool) $this->_unique;
+		return $this->_uniques;
 
 	}
 
@@ -175,9 +186,9 @@ class Yab_Db_Table_Column {
 
 	}
 
-	final public function getIndexed() {
+	final public function getIndexes() {
 
-		return (bool) $this->_indexed;
+		return $this->_indexes;
 
 	}
 

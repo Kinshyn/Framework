@@ -192,25 +192,29 @@ class Yab_Db_Statement implements Iterator, Countable {
 
 		if(is_numeric($this->_nb_rows))
 			return $this->_nb_rows;
-	
+
 		if($this->isSelect()) {
-			
+
 			if($this->_result === null) {
 
+				// $statement = new self($this->_adapter, $this->_sql);
+
+				// $statement->select('COUNT(*)');
+
 				$statement = new self($this->_adapter, 'SELECT COUNT(*) FROM ('.$this->_sql.') as T');
-			
+
 				$this->_nb_rows = $statement->toRow()->pop();
-				
+
 				unset($statement);
-				
+
 			} else {
 
 				$this->_nb_rows = $this->_adapter->getSelectedRows($this->_result);
-				
+
 			}
 
 		} else {
-			
+
 			$this->query();
 			
 			$this->_nb_rows = $this->_adapter->getAffectedRows();
@@ -373,11 +377,17 @@ class Yab_Db_Statement implements Iterator, Countable {
 	
 	}
 	
+	public function hasUnion() {
+	
+		return preg_match('#^\s+union\s+#is', $this->getPackedSql());
+	
+	}
+	
 	public function select($select) {
 	
 		$this->pack();
 		
-		$this->_sql = preg_replace('#^\s*select\s+.*\s+from\s+#is', 'SELECT '.$select.' FROM ', $this->_sql);
+		$this->_sql = preg_replace('#^\s*select\s+.*\s+from\s+#is', 'SELECT '.$select.' FROM ', $this->_sql, 1);
 		
 		$this->unpack();
 		
