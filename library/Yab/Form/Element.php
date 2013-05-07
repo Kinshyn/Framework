@@ -93,15 +93,12 @@ class Yab_Form_Element extends Yab_Object {
 
 	}
 
-	public function getErrors($value = null, $filters = null) {
+	public function getErrors($filters = null) {
 
 		if($this->_errors !== null)
 			return $this->_errors;
-			
-		if($value === null)
-			$value = $this->getValue();
-			
-		$this->_errors = $this->getValueErrors($value, $filters);
+
+		$this->_errors = $this->getValueErrors($this->getValue(), $filters);
 
 		return $this->_errors;
 
