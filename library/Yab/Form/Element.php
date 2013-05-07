@@ -74,8 +74,11 @@ class Yab_Form_Element extends Yab_Object {
 
 	}
 
-	public function isValid() {
+	public function isValid($value = null) {
 
+		if($value !== null)
+			return ((bool) (count($this->getValueErrors($value)) === 0));
+	
 		return ((bool) (count($this->getErrors()) === 0));
 
 	}
@@ -90,12 +93,23 @@ class Yab_Form_Element extends Yab_Object {
 
 	}
 
-	public function getErrors($filters = null) {
+	public function getErrors($value = null, $filters = null) {
 
 		if($this->_errors !== null)
 			return $this->_errors;
 			
-		$this->_errors = array();
+		if($value === null)
+			$value = $this->getValue();
+			
+		$this->_errors = $this->getValueErrors($value, $filters);
+
+		return $this->_errors;
+
+	}
+
+	public function getValueErrors($value, $filters = null) {
+
+		$errors = array();
 
 		$validators = $this->has('validators') ? $this->get('validators', 'Array') : array();
 		$override_errors = $this->has('errors') ? $this->get('errors', 'Array') : array();
@@ -110,9 +124,13 @@ class Yab_Form_Element extends Yab_Object {
 				$options['fake_options'] = $this->get('fake_options');
 			
 			if($this->has('min_options')) {
+			
 				$options['min_options'] = $this->get('min_options', 'Int');
+
 			} elseif($this->get('needed')) {
+			
 				$options['min_options'] = 1;
+				
 			}
 				
 			if($this->has('max_options'))
@@ -126,26 +144,24 @@ class Yab_Form_Element extends Yab_Object {
 
 		$validator->set('validators', $validators);
 		$validator->set('errors', $override_errors);
-		
+
 		if($filters !== null)
 		  $validator->set('filters', $filters);
-		
-		$value = $this->getValue();
-		
+
 		$validator->validate($value);
 		
 		if($this->get('type') == 'file') {
 
 			if($this->get('needed'))
-				$this->_errors = $validator->getErrors();
+				$errors = $validator->getErrors();
 		
 		} elseif($value || $this->get('needed')) {
 
-			$this->_errors = $validator->getErrors();
+			$errors = $validator->getErrors();
 			
 		}
 
-		return $this->_errors;
+		return $errors;
 
 	}
 

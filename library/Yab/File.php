@@ -280,13 +280,13 @@ class Yab_File {
 		
 			$part = array_shift($parts);
 			
-			if(!$part) continue;
+			//if(!$part) continue;
 		
 			$directory .= $part.DIRECTORY_SEPARATOR;
-			
-			if(!Yab_Loader::getInstance()->isDir($directory))
-				mkdir($directory, 0755);
-			
+
+			if(!Yab_Loader::getInstance()->isDir($directory)) 
+				mkdir($directory, 0755);	
+
 			if(!Yab_Loader::getInstance()->isDir($directory))
 				throw new Yab_Exception('can not create the directory "'.$directory.'"');
 		

@@ -14,7 +14,7 @@ class Yab_Helper_Form {
 
 	private $_form = null;
 	private $_readonly = false;
-	private $_submits = array('' => 'Submit');
+	private $_submits = array();
 	private $_legend = null;
 	private $_buttons = array();
 
@@ -41,10 +41,8 @@ class Yab_Helper_Form {
 	}
 
 	public function setSubmit($submit, $name = '') {
-	
-		$name = (string) $name;
-	
-		$this->_submits[$name] = (string) $submit;
+
+		$this->_submits[(string) $name] = (string) $submit;
 
 		return $this;
 
@@ -62,8 +60,13 @@ class Yab_Helper_Form {
 
 		$filter = new Yab_Filter_Html();
 
-		$errors = $this->_form->getErrors();
+		$form_submitted = $this->_form->isSubmitted();
+		
+		$errors = array();
 
+		if($form_submitted)
+			$errors = $this->_form->getErrors();
+		
 		$html = $this->_form->set('class', 'form')->getHeadHtml();
 
 		$html .= "\t".'<fieldset>'.PHP_EOL;
@@ -104,12 +107,15 @@ class Yab_Helper_Form {
 
 			}
 
-			$html .= "\t\t".'<p class="field '.$element->get('type').($element->isSubmitted() && !$element->isValid() ? ' error' : '').'" id="F'.$element->get('name').'">'.PHP_EOL;
+			$html .= "\t\t".'<p class="field '.$element->get('type').($form_submitted && $element->isSubmitted() && !$element->isValid() ? ' error' : '').'" id="F'.$element->get('name').'">'.PHP_EOL;
 
 			if($element->has('label')) {
 				
 				$html .= "\t\t\t".'<label for="'.$id.'">'.$filter->filter($element->get('label'));
 				
+				if(!$element->isValid(''))
+					$html .= '&nbsp;*';
+
 				if($element->has('tooltip'))
 					$html .= '<em style="display: block">'.nl2br($filter->filter($element->get('tooltip'))).'</em>';
 				
@@ -123,6 +129,9 @@ class Yab_Helper_Form {
 		}
 
 		$html .= "\t\t".'<p class="button">'.PHP_EOL;
+		
+		if(!count($this->_submits))
+			$this->setSubmit('Submit');
 		
 		foreach($this->_submits as $name => $submit)
 			$html .= "\t\t\t".'<input class="button" '.($name ? 'name="'.$name.'" ' : '').'type="submit" value="'.$filter->filter($submit).'" />'.PHP_EOL;
