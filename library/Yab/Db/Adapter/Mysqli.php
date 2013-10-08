@@ -81,7 +81,7 @@ class Yab_Db_Adapter_Mysqli extends Yab_Db_Adapter_Abstract {
 		if(!($rowset instanceof mysqli_result))
 			throw new Yab_Exception('rowset must be an instance of mysqli_result');
 	
-		return $rowset->data_seek($offset);
+		return $rowset->data_seek($row);
 
 	}
 
@@ -222,7 +222,7 @@ class Yab_Db_Adapter_Mysqli extends Yab_Db_Adapter_Abstract {
 		if(!$this->isConnected())
 			$this->connect();
 
-		return $this->query('SET NAMES '.$this->quoteIdentifier($encoding).';', $this->_connexion);
+		return $this->query('SET NAMES '.$this->quoteIdentifier($encoding).';', $this->_mysqli);
 
 	}
 
@@ -242,7 +242,7 @@ class Yab_Db_Adapter_Mysqli extends Yab_Db_Adapter_Abstract {
 
 		$rowset = $this->_mysqli->query($sql);
 
-		$this->_affected_rows = $rowset->affected_rows;
+		$this->_affected_rows = isset($rowset->affected_rows) ? $rowset->affected_rows : 0;
 
 		return $rowset;
 
