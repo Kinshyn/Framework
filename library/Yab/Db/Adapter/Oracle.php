@@ -78,7 +78,7 @@ class Yab_Db_Adapter_Oracle extends Yab_Db_Adapter_Abstract {
 
 	public function seek($rowset, $row) {
 
-		return @oci_set_prefetch($rowset, $row);
+		throw new Yab_Exception('Can not seek an Oracle rowset');
 
 	}
 
@@ -182,7 +182,7 @@ class Yab_Db_Adapter_Oracle extends Yab_Db_Adapter_Abstract {
 
 		$statement = $this->prepare($sql);
 		
-		$statement->where('rownum BETWEEN '.$from.' AND '.($from + $offset));
+		$statement->where('ROWNUM BETWEEN '.$from.' AND '.($from + $offset));
 	
 		return (string) $statement;
 		
