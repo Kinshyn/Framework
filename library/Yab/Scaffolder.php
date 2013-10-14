@@ -491,7 +491,7 @@ class Yab_Scaffolder extends Yab_Object {
 
 		$file = new Yab_File($this->_directory.DIRECTORY_SEPARATOR.$file_path);
 		
-		$file->append($content)->write();
+		$file->append($content)->write()->chmod(0777);
 	
 		echo 'Creation de '.$file->getPath().'<br />';
 	
