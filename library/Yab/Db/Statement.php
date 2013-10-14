@@ -305,7 +305,7 @@ class Yab_Db_Statement implements Iterator, Countable {
 		if(array_key_exists($string, $row))
 			return $row[$string];
 	
-        preg_match_all('#:([a-zA-Z0-9_]+)([^a-zA-Z0-9_]|$)#i', $string, $match);
+        	preg_match_all('#:([a-zA-Z0-9_]+)([^a-zA-Z0-9_]|$)#i', $string, $match);
 
 		foreach($match[1] as $expression) {
 
