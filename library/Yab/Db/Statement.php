@@ -30,6 +30,7 @@ class Yab_Db_Statement implements Iterator, Countable {
 
 	private $_key = null;
 	private $_value = null;
+	private $_keys_values = array();
 	
 	private $_packs = array();
 
@@ -41,6 +42,14 @@ class Yab_Db_Statement implements Iterator, Countable {
 			
 		$this->trim();
 
+	}
+        
+	public function addKeyValue($key, $value) {
+		
+		$this->_keys_values[$key] = (string) $value;
+		
+		return $this;
+		
 	}
 
 	public function setKey($key) {
@@ -197,11 +206,7 @@ class Yab_Db_Statement implements Iterator, Countable {
 
 			if($this->_result === null) {
 
-				// $statement = new self($this->_adapter, $this->_sql);
-
-				// $statement->select('COUNT(*)');
-
-				$statement = new self($this->_adapter, 'SELECT COUNT(*) FROM ('.$this->_sql.') as T');
+				$statement = new self($this->_adapter, 'SELECT COUNT(*) FROM ('.$this->_sql.') T');
 
 				$this->_nb_rows = $statement->toRow()->pop();
 
@@ -243,6 +248,19 @@ class Yab_Db_Statement implements Iterator, Countable {
 
 		$this->_row = $this->_adapter->fetch($this->_result);
 
+		if($this->valid()) {
+		
+			foreach($this->_keys_values as $key => $value) {
+			
+				$key = $this->_rowbind($key, $this->_row);
+				$value = $this->_rowbind($value, $this->_row);
+			
+				$this->_row[$key] = $value;
+			
+			}
+		
+		}
+		
 		$this->_offset++;
 
 		return $this;
@@ -261,7 +279,7 @@ class Yab_Db_Statement implements Iterator, Countable {
 	public function key() {
 
 		if($this->_key !== null)
-			return (string) $this->_row[$this->_key];
+			return $this->_rowbind($this->_key, $this->_row);
 
 		return $this->_offset;
 
@@ -275,11 +293,32 @@ class Yab_Db_Statement implements Iterator, Countable {
 		if(is_object($this->_value))
 			return $this->_value->feed($this->_row);
 
-		if($this->_value !== null)
-			return $this->_row[$this->_value];
+		if($this->_value !== null) 
+			return $this->_rowbind($this->_value, $this->_row);
 
 		return new Yab_Object($this->_row);
 
+	}
+	
+	protected function _rowbind($string, array $row) {
+
+		if(array_key_exists($string, $row))
+			return $row[$string];
+	
+        preg_match_all('#:([a-zA-Z0-9_]+)([^a-zA-Z0-9_]|$)#i', $string, $match);
+
+		foreach($match[1] as $expression) {
+
+			if(array_key_exists($expression, $row))
+				$string = str_replace(':'.$expression, $row[$expression], $string);
+
+			if($expression == 'ROWNUM')
+				$string = str_replace(':'.$expression, $this->_offset, $string);
+			
+		}
+		
+		return $string;
+	
 	}
 
 	public function getSql() {
