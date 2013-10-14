@@ -234,8 +234,17 @@ class Yab_Db_Statement implements Iterator, Countable {
 
 		$this->query();
 
-		$this->_adapter->seek($this->_result, $this->_start);
-
+                try {
+                    
+                    $this->_adapter->seek($this->_result, $this->_start);
+                    
+                } catch(Yab_Exception $e) {
+                    
+                    // Oracle can not, must reexecute
+                    $this->free()->query();
+                    
+                }
+                
 		$this->_offset = $this->_start - 1;
 
 		return $this->next();
