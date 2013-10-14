@@ -295,6 +295,14 @@ class Yab_File {
 		return $this;
 	
 	}
+
+	final public function chmod($chmod) {
+
+		chmod($this->getPath(), $chmod);
+		
+		return $this;
+
+	}
 	
 	final public function getExtension() {
 
