@@ -12,6 +12,8 @@
 
 class Yab_Db_Adapter_Oracle extends Yab_Db_Adapter_Abstract {
 
+        const YAB_LIMIT_ROWNUM = 'YAB_LIMIT_ROWNUM';
+    
 	private $_connexion = null;
 
 	private $_host = null;
@@ -72,7 +74,12 @@ class Yab_Db_Adapter_Oracle extends Yab_Db_Adapter_Abstract {
 
 	public function fetch($rowset) {
 		
-		return oci_fetch_assoc($rowset);
+		$data = oci_fetch_assoc($rowset);
+                
+                if(array_key_exists(self::YAB_LIMIT_ROWNUM, $data))
+                        unset($data[self::YAB_LIMIT_ROWNUM]);
+                
+                return $data;
 
 	}
 
@@ -180,11 +187,15 @@ class Yab_Db_Adapter_Oracle extends Yab_Db_Adapter_Abstract {
 
 	public function limit($sql, $from, $offset) {
 
-		$statement = $this->prepare($sql);
-		
-		$statement->where('ROWNUM BETWEEN '.$from.' AND '.($from + $offset));
-	
-		return (string) $statement;
+            return '
+                SELECT T_ORA_SQL2.*  
+                FROM (
+                    SELECT T_ORA_SQL1.*, ROWNUM '.self::YAB_LIMIT_ROWNUM.'
+                    FROM ('.$sql.') T_ORA_SQL1
+                    WHERE ROWNUM <= '.intval($from + $offset).'
+                ) T_ORA_SQL2
+                WHERE T_ORA_SQL2.'.self::YAB_LIMIT_ROWNUM.' > '.intval($from).'
+            ';
 		
 	}
 
