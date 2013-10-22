@@ -548,6 +548,9 @@ class Yab_Db_Statement implements Iterator, Countable {
 	}
 
 	public function orderBy($order_by) {
+		
+		if(!is_array($order_by))
+			$order_by = array($order_by => 'ASC');
 
 		$sql_parts = preg_split('#\s+ORDER\s+BY\s+#', $this->_sql);
 	
