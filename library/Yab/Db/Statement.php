@@ -30,7 +30,6 @@ class Yab_Db_Statement implements Iterator, Countable {
 
 	private $_key = null;
 	private $_value = null;
-	private $_keys_values = array();
 	
 	private $_packs = array();
 
@@ -42,14 +41,6 @@ class Yab_Db_Statement implements Iterator, Countable {
 			
 		$this->trim();
 
-	}
-        
-	public function setKeyValue($key, $value) {
-		
-		$this->_keys_values[$key] = (string) $value;
-		
-		return $this;
-		
 	}
 
 	public function setKey($key) {
@@ -265,19 +256,6 @@ class Yab_Db_Statement implements Iterator, Countable {
 		} else {
 		
 			$this->_row = null;
-		
-		}
-
-		if($this->valid()) {
-		
-			foreach($this->_keys_values as $key => $value) {
-
-				$this->_row->set(
-					$this->_row->expression($key, array('ROWNUM' => $this->_offset)), 
-					$this->_row->expression($value, array('ROWNUM' => $this->_offset))
-				);
-			
-			}
 		
 		}
 		
