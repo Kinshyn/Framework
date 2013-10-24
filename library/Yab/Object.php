@@ -126,6 +126,49 @@ class Yab_Object implements ArrayAccess, Iterator, Countable {
 		return Yab_Loader::getInstance('Yab_Filter_Factory')->feed($this->_attributes)->set('filters', $filters)->filter($this->_attributes[$key]);
 
 	}
+
+	public function expression($expression, array $additionnal_attributes = array()) {
+
+		if(array_key_exists($expression, $this->_attributes))
+			return $this->_attributes[$expression];
+	
+		preg_match_all('#:([a-zA-Z0-9_]+)([^a-zA-Z0-9_]|$)#i', $expression, $matches1);
+
+		foreach($matches1[1] as $match1) {
+			
+			$filters = array();
+
+			if(preg_match('#'.preg_quote(':'.$match1, '#').'\[([^\]]+)\]#i', $expression, $matches2)) {			
+				
+				$filters = preg_split('#[^a-zA-Z0-9_\-]+#', $matches2[1]);
+				
+				$expression = preg_replace('#'.preg_quote($matches2[0], '#').'#', ':'.$match1, $expression, 1);
+				
+			}
+
+			if(array_key_exists($match1, $this->_attributes)) {
+				
+				if(count($filters)) 
+					$this->_attributes[$match1] = Yab_Loader::getInstance('Yab_Filter_Factory')->feed($this->_attributes + $additionnal_attributes)->set('filters', $filters)->filter($this->_attributes[$match1]);
+
+				$expression = str_replace(':'.$match1, $this->_attributes[$match1], $expression);
+				
+			}
+
+			if(array_key_exists($match1, $additionnal_attributes)) {
+				
+				if(count($filters)) 
+					$additionnal_attributes[$match1] = Yab_Loader::getInstance('Yab_Filter_Factory')->feed($this->_attributes + $additionnal_attributes)->set('filters', $filters)->filter($additionnal_attributes[$match1]);
+
+				$expression = str_replace(':'.$match1, $additionnal_attributes[$match1], $expression);
+				
+			}
+
+		}
+		
+		return $expression;
+		
+	}
 	
 	public function flash($key, $filters = null) {
 
