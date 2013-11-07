@@ -17,9 +17,7 @@ try {
 	$scaffolder->setDb($db);
 	
 	$scaffolder->setDirectory($root.'application');
-	
-	$scaffolder->set('model_cache_column', false);
-	
+
 	$scaffolder->scaffold();
 		
 } catch(Yab_Exception $e) {
