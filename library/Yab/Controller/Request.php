@@ -88,6 +88,15 @@ class Yab_Controller_Request {
 		return $server->has('HTTP_X_REQUESTED_WITH') && $server->get('HTTP_X_REQUESTED_WITH', 'LowerCase') == 'xmlhttprequest';
 
 	}
+	
+	final public function isMobile() {
+
+		if(!$server->has('HTTP_USER_AGENT'))
+			return false;
+
+		return preg_match('#(iphone|ipod|android|blackberry|smartphone|wap|xoom|symbian|mobile)#i', $server->get('HTTP_USER_AGENT'));
+
+	}
 
 	final public function isGet() {
 
