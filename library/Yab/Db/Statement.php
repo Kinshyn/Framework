@@ -315,9 +315,9 @@ class Yab_Db_Statement implements Iterator, Countable {
 
 	}
 	
-	public function getPackedSql() {
+	public function getPackedSql($recursive_pack = true) {
 
-		$this->pack();
+		$this->pack($recursive_pack);
 	
 		$packed_sql = $this->_sql;
 		
@@ -448,10 +448,10 @@ class Yab_Db_Statement implements Iterator, Countable {
 
 		$tables = array();
 
-		if(preg_match('#\s*SELECT\s+.+\s+FROM\s+(.+)\s*(ORDER\s+BY|LIMIT|GROUP|WHERE|INNER|LEFT|RIGHT|JOIN|$)#Uis', $this->getPackedSql(), $match))
-			$tables += $this->_extractTables(preg_split('#\s*,\s*#is', $match[1]));
+		if(preg_match_all('#\s*SELECT\s+.+\s+FROM\s+([^\(\)]+)\s*(ORDER\s+BY|LIMIT|GROUP|WHERE|INNER|LEFT|RIGHT|JOIN|$)#Uis', $this->getPackedSql(false), $match))
+			$tables += $this->_extractTables($match[1]);
 
-		preg_match_all('#\s+JOIN\s+(.+)\s+ON\s+(.+)(ORDER\s+BY|LIMIT|GROUP|WHERE|INNER|LEFT|RIGHT|JOIN|$)#Uis', $this->getPackedSql(), $match);
+		preg_match_all('#\s+JOIN\s+([^\(\)]+)\s+ON\s+(.+)(ORDER\s+BY|LIMIT|GROUP|WHERE|INNER|LEFT|RIGHT|JOIN|$)#Uis', $this->getPackedSql(false), $match);
 
 		$tables += $this->_extractTables($match[1]);
 
@@ -484,9 +484,9 @@ class Yab_Db_Statement implements Iterator, Countable {
 		
 			$name = $this->_adapter->unquoteIdentifier($name);
 			$alias = $this->_adapter->unquoteIdentifier($alias);
-				
+
 			$tables[$alias] =  $this->_adapter->getTable($name);
-		
+
 		}
 		
 		return $tables;
