@@ -12,8 +12,6 @@
 
 class Yab_Object implements ArrayAccess, Iterator, Countable {
 
-	private $_offset = -1;
-
 	protected $_attributes = array();
 
 	public function __construct($mixed = null) {
@@ -297,8 +295,6 @@ class Yab_Object implements ArrayAccess, Iterator, Countable {
 
 	public function next() {
 
-		$this->_offset++;
-
 		next($this->_attributes);
 
 		return $this->current();
@@ -306,8 +302,6 @@ class Yab_Object implements ArrayAccess, Iterator, Countable {
 	}
 
 	public function rewind() {
-
-		$this->_offset = 0;
 
 		reset($this->_attributes);
 
@@ -324,24 +318,6 @@ class Yab_Object implements ArrayAccess, Iterator, Countable {
 	public function current() {
 
 		return current($this->_attributes);
-
-	}
-
-	public function offset() {
-
-		return $this->_offset;
-
-	}
-
-	public function isFirst() {
-
-		return ((bool) ($this->_offset < 0));
-
-	}
-
-	public function isLast() {
-
-		return ((bool) ($this->_offset === $this->count() - 2));
 
 	}
 
@@ -369,7 +345,7 @@ class Yab_Object implements ArrayAccess, Iterator, Countable {
 
 	}
 
-	public function cast($key, $bind = false) {
+	public function cast($key) {
 
 		$value = $this->get($key);
 
