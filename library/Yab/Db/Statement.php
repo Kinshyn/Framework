@@ -15,6 +15,8 @@ class Yab_Db_Statement implements Iterator, Countable {
 	const LEFT_PACK_BOUNDARY = '###-_-';
 	const RIGHT_PACK_BOUNDARY = '-_-###';
 
+	const EXPRESSION_ROWNUM = 'ROWNUM';
+	
 	private $_adapter = null;
 
 	private $_sql = null;
@@ -158,10 +160,16 @@ class Yab_Db_Statement implements Iterator, Countable {
 		return $this;
 
 	}
+	
+	public function isExecuted() {
+	
+		return (bool) ($this->_result !== null);
+	
+	}
 
-	public function query() {
+	public function execute() {
 
-		if($this->_result !== null)
+		if($this->isExecuted())
 			return $this->_result;
 
 		$this->_result = $this->_adapter->query($this->_sql);
@@ -211,7 +219,7 @@ class Yab_Db_Statement implements Iterator, Countable {
 
 		} else {
 
-			$this->query();
+			$this->execute();
 			
 			$this->_nb_rows = $this->_adapter->getAffectedRows();
 		
@@ -223,18 +231,21 @@ class Yab_Db_Statement implements Iterator, Countable {
 
 	public function rewind() {
 
-		$this->query();
+		$executed = $this->isExecuted();
+	
+		$this->execute();
 
-                try {
-                    
-                    $this->_adapter->seek($this->_result, $this->_start);
-                    
-                } catch(Yab_Exception $e) {
-                    
-                    // Oracle can not, must reexecute
-                    $this->free()->query();
-                    
-                }
+		try {
+				
+			$this->_adapter->seek($this->_result, $this->_start);
+
+		} catch(Yab_Exception $e) {
+			
+			// must reexecute if already executed and seek not implemented (ex: Oracle)
+			if($executed)
+				$this->free()->execute();
+			
+		}
                 
 		$this->_offset = $this->_start - 1;
 
@@ -244,7 +255,7 @@ class Yab_Db_Statement implements Iterator, Countable {
 
 	public function next() {
 
-		$this->query();
+		$this->execute();
 
 		if($row = $this->_adapter->fetch($this->_result)) {
 		
@@ -277,7 +288,7 @@ class Yab_Db_Statement implements Iterator, Countable {
 	public function key() {
 
 		if($this->_key !== null) 
-			return $this->_row->expression($this->_key, array('ROWNUM' => $this->_offset));
+			return $this->_row->expression($this->_key, array(self::EXPRESSION_ROWNUM => $this->_offset));
 
 		return $this->_offset;
 
@@ -292,7 +303,7 @@ class Yab_Db_Statement implements Iterator, Countable {
 			return $this->_value->feed($this->_row->toArray());
 
 		if($this->_value !== null) 
-			return $this->_row->expression($this->_value, array('ROWNUM' => $this->_offset));
+			return $this->_row->expression($this->_value, array(self::EXPRESSION_ROWNUM => $this->_offset));
 
 		return $this->_row;
 
