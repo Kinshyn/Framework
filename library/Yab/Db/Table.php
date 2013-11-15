@@ -127,13 +127,8 @@ class Yab_Db_Table extends Yab_Object {
 	}
 
 	final public function getColumns() {
-
-		if(count($this->_columns))	
-			return $this->_columns;
 	
-		$this->_columns = $this->_adapter->getColumns($this);
-		
-		return $this->_columns;
+		return $this->_adapter->getColumns($this);
 
 	}
 
