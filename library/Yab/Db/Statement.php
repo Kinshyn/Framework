@@ -12,8 +12,8 @@
 
 class Yab_Db_Statement implements Iterator, Countable {
 
-	const LEFT_PACK_BOUNDARY = '###-_-';
-	const RIGHT_PACK_BOUNDARY = '-_-###';
+	const LEFT_PACK_BOUNDARY = '-L_-';
+	const RIGHT_PACK_BOUNDARY = '-_R-';
 
 	const EXPRESSION_ROWNUM = 'ROWNUM';
 	
@@ -314,18 +314,6 @@ class Yab_Db_Statement implements Iterator, Countable {
 		return $this->_sql;
 
 	}
-	
-	public function getPackedSql($recursive_pack = true) {
-
-		$this->pack($recursive_pack);
-	
-		$packed_sql = $this->_sql;
-		
-		$this->unpack();
-		
-		return $packed_sql;
-
-	}
 
 	public function getAdapter() {
 
@@ -350,16 +338,26 @@ class Yab_Db_Statement implements Iterator, Countable {
 
 	}
 	
-	public function pack($recursive_pack = true) {
+	public function getPackedSql() {
+
+		$this->pack();
+	
+		$packed_sql = $this->_sql;
+		
+		$this->unpack();
+		
+		return $packed_sql;
+
+	}
+	
+	public function pack() {
 
 		if(count($this->_packs))
 			throw new Yab_Exception('You can not pack an already packed statement');
 
 		$regexps = array();
 		
-		if($recursive_pack)
-			array_unshift($regexps, '#(\([^\)\(]*\))#');
-			
+		array_unshift($regexps, '#(\([^\)\(]*\))#');
 		array_push($regexps, '#('.preg_quote(substr($this->_adapter->quote('"'), 1, -1), '#').')#');
 		array_push($regexps, '#("[^"]*")#');
 		array_push($regexps, '#('.preg_quote(substr($this->_adapter->quote("'"), 1, -1), '#').')#');
@@ -387,15 +385,38 @@ class Yab_Db_Statement implements Iterator, Countable {
 	
 	}
 	
-	public function unpack() {
+	public function unpack($sql_or_index = null) {
 
-		while(preg_match('#'.preg_quote(self::LEFT_PACK_BOUNDARY, '#').'([0-9]+)'.preg_quote(self::RIGHT_PACK_BOUNDARY, '#').'#is', $this->_sql, $match) && array_key_exists($match[1], $this->_packs))
-			$this->_sql = str_replace(self::LEFT_PACK_BOUNDARY.$match[1].self::RIGHT_PACK_BOUNDARY, $this->_packs[$match[1]], $this->_sql);
-
-		$this->_packs = array();
+		if($sql_or_index === null) {
 		
-		return $this;
-	
+			while(preg_match('#'.preg_quote(self::LEFT_PACK_BOUNDARY, '#').'([0-9]+)'.preg_quote(self::RIGHT_PACK_BOUNDARY, '#').'#is', $this->_sql, $match) && array_key_exists($match[1], $this->_packs))
+				$this->_sql = str_replace(self::LEFT_PACK_BOUNDARY.$match[1].self::RIGHT_PACK_BOUNDARY, $this->_packs[$match[1]], $this->_sql);
+
+			$this->_packs = array();
+
+			return $this;
+		
+		}
+		
+		$this->pack();
+
+		if(is_numeric($sql_or_index)) {
+		
+			$sql = $this->_packs[$sql_or_index];
+			
+		} else {
+		
+			$sql = (string) $sql_or_index;
+			
+		}
+
+		while(preg_match('#'.preg_quote(self::LEFT_PACK_BOUNDARY, '#').'([0-9]+)'.preg_quote(self::RIGHT_PACK_BOUNDARY, '#').'#is', $sql, $match) && array_key_exists($match[1], $this->_packs))
+			$sql = str_replace(self::LEFT_PACK_BOUNDARY.$match[1].self::RIGHT_PACK_BOUNDARY, $this->_packs[$match[1]], $sql);
+
+		$this->unpack();
+		
+		return $sql;
+
 	}
 	
 	public function isSelect() {
@@ -422,11 +443,11 @@ class Yab_Db_Statement implements Iterator, Countable {
 	
 	}
 	
-	public function getSelect() {
+	public function getSelect($explain_wildcards = false) {
 	
 		$select = array();
 		
-		$sql_selects = preg_replace('#^\s*SELECT\s(.+)\sFROM\s+.*$#is', '$1', $this->getPackedSql());
+		$sql_selects = preg_replace('#^\s*SELECT\s(.+)\sFROM\s+.*$#Uis', '$1', $this->getPackedSql());
 
 		$sql_selects = explode(',', $sql_selects);
 		$sql_selects = array_map('trim', $sql_selects);
@@ -436,7 +457,52 @@ class Yab_Db_Statement implements Iterator, Countable {
 			$sql_select = preg_split('#\s+AS\s+#is', $sql_select);
 			$sql_select = array_map('trim', $sql_select);
 
-			array_push($select, array_pop($sql_select));
+			$expression = $this->unpack(array_shift($sql_select));
+			
+			$alias = array_pop($sql_select);
+			
+			if(!$alias) 
+				$alias = $this->_adapter->unQuoteIdentifier(array_pop(explode('.', $expression)));
+
+			if($explain_wildcards && preg_match('#^(.+)\.\*$#', $expression, $match)) {
+			
+				$table_alias = $this->_adapter->unQuoteIdentifier($match[1]);
+			
+				$tables = $this->getTables();
+			
+				if(!array_key_exists($table_alias, $tables))
+					throw new Yab_Exception('table_alias "'.$table_alias.'" not found in the SQL statement');
+			
+				$table = $tables[$table_alias];
+				
+				try {
+				
+					$columns = $table->getColumns();
+					
+					foreach($columns as $column)
+						$select[$this->_adapter->unQuoteIdentifier($column->getName())] = $this->_adapter->quoteIdentifier($table_alias).'.'.$this->_adapter->quoteIdentifier($column->getName());
+					
+				} catch(Yab_Exception $e) {
+				
+					$index = strtr($table->getName(), array(
+						self::LEFT_PACK_BOUNDARY => '',
+						self::RIGHT_PACK_BOUNDARY => '',
+					));
+				
+					# table est un pack !
+
+					$stmt = new Yab_Db_Statement($this->_adapter, $this->unpack($index));
+					
+					foreach($stmt->getSelect() as $stmt_alias => $stmt_expression)
+						$select[$stmt_alias] = $this->_adapter->quoteIdentifier($table_alias).'.'.$this->_adapter->quoteIdentifier($stmt_alias);
+					
+				}
+	
+			} else {
+			
+				$select[$alias] = $expression;
+				
+			}
 			
 		}
 
@@ -444,16 +510,55 @@ class Yab_Db_Statement implements Iterator, Countable {
 	
 	}
 	
+	public function isPacked($sql) {
+	
+		return preg_match('#'.preg_quote(self::LEFT_PACK_BOUNDARY, '#').'([0-9]+)'.preg_quote(self::RIGHT_PACK_BOUNDARY, '#').'#is', $sql);
+	
+	}
+	
 	public function getTables() {
 
 		$tables = array();
 
-		if(preg_match_all('#\s*SELECT\s+.+\s+FROM\s+([^\(\)]+)\s*(ORDER\s+BY|LIMIT|GROUP|WHERE|INNER|LEFT|RIGHT|JOIN|$)#Uis', $this->getPackedSql(false), $match))
-			$tables += $this->_extractTables($match[1]);
+		if(preg_match('#\s*SELECT\s+.+\s+FROM\s+(.+)\s*(ORDER\s+BY|LIMIT|GROUP|WHERE|INNER|LEFT|RIGHT|JOIN|FULL|NATURAL|CROSS|$)#Uis', $this->getPackedSql(), $match)) {
+			
+			$from = trim($match[1]);
+			$unpack_from = $this->unpack($from);
+			
+			if($from != $unpack_from) {
+			
+				$stmt = new Yab_Db_Statement($this->_adapter, $unpack_from);
+			
+				$tables += $stmt->getTables();
+			
+			} else {
+			
+				$tables += $this->_extractTables(preg_split('#\s*,\s*#is', $from));
+			
+			}
 
-		preg_match_all('#\s+JOIN\s+([^\(\)]+)\s+ON\s+(.+)(ORDER\s+BY|LIMIT|GROUP|WHERE|INNER|LEFT|RIGHT|JOIN|$)#Uis', $this->getPackedSql(false), $match);
+		}
 
-		$tables += $this->_extractTables($match[1]);
+		preg_match_all('#\s+JOIN\s+(.+)\s+ON\s+.+(ORDER\s+BY|LIMIT|GROUP|WHERE|INNER|LEFT|RIGHT|JOIN|FULL|NATURAL|CROSS|$)#Uis', $this->getPackedSql(), $match);
+
+		foreach($match[1] as $join) {
+		
+			$join = trim($join);
+			$unpack_join= $this->unpack($join);
+			
+			if($join != $unpack_join) {
+			
+				$stmt = new Yab_Db_Statement($this->_adapter, $unpack_join);
+			
+				$tables += $stmt->getTables();
+			
+			} else {
+			
+				$tables += $this->_extractTables($join);
+			
+			}
+		
+		}
 
 		return $tables;
 	
@@ -462,7 +567,7 @@ class Yab_Db_Statement implements Iterator, Countable {
 	private function _extractTables($aliased_tables) {
 	
 		if(!is_array($aliased_tables))
-			$aliased_tables = array($aliased_tables);
+			$aliased_tables = preg_split('#\s*,\s*#s', $aliased_tables);
 	
 		$tables = array();
 	
@@ -626,7 +731,7 @@ class Yab_Db_Statement implements Iterator, Countable {
 			$this->_adapter->free($this->_result);
 
 	}
-
+	
 }
 
 // Do not clause PHP tags unless it is really necessary
