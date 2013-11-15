@@ -16,6 +16,8 @@ abstract class Yab_Db_Adapter_Abstract {
 
 	static private $_default_adapter = null;
 
+	private $_columns = array();
+	
 	final public function __construct() {
 
 		if(!self::hasDefaultAdapter())
@@ -179,9 +181,35 @@ abstract class Yab_Db_Adapter_Abstract {
 
 	}
 	
-	final public function getColumns($table) {
+	final public function resetColumns($table = null) {
+		
+		$table_name = (string) $table;
+		
+		if($table_name) {
+		
+			if(array_key_exists($table_name, $this->_columns))
+				unset($this->_columns[$table_name]);
+				
+		} else {
+		
+			$this->_columns = array();
+		
+		}
+		
+		return $this;
 	
-		return $this->_columns($table);
+	}
+	
+	final public function getColumns($table) {
+		
+		$table_name = (string) $table;
+		
+		if(array_key_exists($table_name, $this->_columns))
+			return $this->_columns[$table_name];
+	
+		$this->_columns[$table_name] = $this->_columns($table);
+		
+		return $this->_columns[$table_name];
 	
 	}
 
