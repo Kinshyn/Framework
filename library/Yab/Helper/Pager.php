@@ -88,7 +88,7 @@ class Yab_Helper_Pager {
 			
 		}
 		
-		$statement->query();
+		$statement->execute();
 		
 		$this->_total = count($statement);
 
