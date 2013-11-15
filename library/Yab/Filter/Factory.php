@@ -25,11 +25,11 @@ class Yab_Filter_Factory extends Yab_Filter_Abstract {
 
 			try {
 
-				$filter = Yab_Loader::getInstance($filter_name, array($filter_options), 'Yab_Filter_Abstract')->feed($this->_attributes);
+				$filter = Yab_Loader::getInstance($filter_name, array(), 'Yab_Filter_Abstract')->feed(array_merge($filter_options, $this->_attributes));
 
 			} catch(Yab_Exception $e) {
 
-				$filter = Yab_Loader::getInstance('Yab_Filter_'.$filter_name, array($filter_options), 'Yab_Filter_Abstract')->feed($this->_attributes);
+				$filter = Yab_Loader::getInstance('Yab_Filter_'.$filter_name, array(), 'Yab_Filter_Abstract')->feed(array_merge($filter_options, $this->_attributes));
 
 			}
 			
