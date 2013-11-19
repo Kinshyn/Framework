@@ -352,21 +352,8 @@ class Yab_Helper_Pager {
 				$sorts[$column_name] = $column_order;
 
 		}
-
-		$sanitize_sorts = array();
 		
-		foreach($sorts as $sort => $order) {
-		
-			$sort = $this->_validSort($sort);
-			
-			if(!$sort)
-				continue;
-				
-			$sanitize_sorts[$sort] = $order;
-	
-		}
-		
-		return $sanitize_sorts;
+		return $sorts;
 
 	}
 
@@ -431,24 +418,6 @@ class Yab_Helper_Pager {
 
 		Yab_Loader::getInstance()->redirect($this->_request->getBaseUrl().$this->_request->getUri($get));
 		
-	}
-
-	protected function _validSort($column_name) {
-
-		if(!$column_name)
-			return '';
-		
-		if(preg_match('#^\s*SELECT(\s+.+\s+)FROM#is', $this->_statement->getPackedSql(), $match))
-			if(preg_match('#([a-z0-9\._]*'.preg_quote($column_name, '#').')([^a-z0-9\._]|$)#uis', $match[1], $match))
-				return $match[1];
-	
-		foreach($this->_statement->getTables() as $alias => $table) 
-			foreach($table->getColumns() as $column) 
-				if($column_name == $column->getName())
-					return $this->_statement->getAdapter()->quoteIdentifier($alias).'.'.$this->_statement->getAdapter()->quoteIdentifier($column_name);
-
-		return '';
-	
 	}
 	
 	protected function _getParam($key, $default = null) {
