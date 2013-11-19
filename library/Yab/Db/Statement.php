@@ -331,7 +331,7 @@ class Yab_Db_Statement implements Iterator, Countable {
 
 		$this->_sql = trim($this->_sql);
 		
-		while(preg_match('#^\(#', $this->_sql) && preg_match('#\)$#', $this->_sql)) 
+		while(preg_match('#^\(#', $this->_sql) && preg_match('#\)\s*[a-zA-Z0-9\-_]*\s*$#', $this->_sql)) 
 			$this->_sql = trim(substr($this->_sql, 1, -1));
 
 		return $this;
@@ -464,40 +464,30 @@ class Yab_Db_Statement implements Iterator, Countable {
 			if(!$alias) 
 				$alias = $this->_adapter->unQuoteIdentifier(array_pop(explode('.', $expression)));
 
-			if($explain_wildcards && preg_match('#^(.+)\.\*$#', $expression, $match)) {
+			if($explain_wildcards && preg_match('#^(.+)\.\s*\*$#', $expression, $match)) {
 			
 				$table_alias = $this->_adapter->unQuoteIdentifier($match[1]);
 			
 				$tables = $this->getTables();
 			
 				if(!array_key_exists($table_alias, $tables))
-					throw new Yab_Exception('table_alias "'.$table_alias.'" not found in the SQL statement');
+					throw new Yab_Exception('table_alias "'.$table_alias.'" not found in the SQL statement [aliases: ('.implode(', ', array_keys($tables)).')]');
 			
 				$table = $tables[$table_alias];
 				
-				try {
+				if($table instanceof self) {
+				
+					$select += $table->getSelect();
+				
+				} else {
 				
 					$columns = $table->getColumns();
 					
 					foreach($columns as $column)
 						$select[$this->_adapter->unQuoteIdentifier($column->getName())] = $this->_adapter->quoteIdentifier($table_alias).'.'.$this->_adapter->quoteIdentifier($column->getName());
 					
-				} catch(Yab_Exception $e) {
-				
-					$index = strtr($table->getName(), array(
-						self::LEFT_PACK_BOUNDARY => '',
-						self::RIGHT_PACK_BOUNDARY => '',
-					));
-				
-					# table est un pack !
-
-					$stmt = new Yab_Db_Statement($this->_adapter, $this->unpack($index));
-					
-					foreach($stmt->getSelect() as $stmt_alias => $stmt_expression)
-						$select[$stmt_alias] = $this->_adapter->quoteIdentifier($table_alias).'.'.$this->_adapter->quoteIdentifier($stmt_alias);
-					
 				}
-	
+
 			} else {
 			
 				$select[$alias] = $expression;
@@ -524,16 +514,40 @@ class Yab_Db_Statement implements Iterator, Countable {
 			
 			$from = trim($match[1]);
 			$unpack_from = $this->unpack($from);
-			
+
 			if($from != $unpack_from) {
 			
-				$stmt = new Yab_Db_Statement($this->_adapter, $unpack_from);
+				$alias = $unpack_from;
 			
-				$tables += $stmt->getTables();
-			
+				if(preg_match('#(\s+[^\s]+)$#', $unpack_from, $match))
+					$alias = $match[1];
+				
+				$tables[trim($this->_adapter->unQuoteIdentifier($alias))] = new self($this->_adapter, $unpack_from);
+	
 			} else {
-			
-				$tables += $this->_extractTables(preg_split('#\s*,\s*#is', $from));
+
+				foreach(preg_split('#\s*,\s*#s', $from) as $table) {
+
+					$table = trim($table);
+				
+					$table = preg_split('#\s+#s', $table);
+				
+					$name = array_shift($table);
+					
+					$name = explode('.', $name);
+					$name = array_pop($name);
+					
+					$alias = array_shift($table);
+					
+					if(!$alias)
+						$alias = $name;
+				
+					$name = $this->_adapter->unquoteIdentifier($name);
+					$alias = $this->_adapter->unquoteIdentifier($alias);
+
+					$tables[$alias] = $this->_adapter->getTable($name);
+
+				}
 			
 			}
 
@@ -547,53 +561,39 @@ class Yab_Db_Statement implements Iterator, Countable {
 			$unpack_join= $this->unpack($join);
 			
 			if($join != $unpack_join) {
+	
+				$alias = $unpack_join;
 			
-				$stmt = new Yab_Db_Statement($this->_adapter, $unpack_join);
-			
-				$tables += $stmt->getTables();
-			
+				if(preg_match('#(\s+[^\s]+)$#', $unpack_join, $match))
+					$alias = $match[1];
+				
+				$tables[trim($this->_adapter->unQuoteIdentifier($alias))] = new self($this->_adapter, $unpack_join);
+
 			} else {
 			
-				$tables += $this->_extractTables($join);
+				$table = trim($join);
+			
+				$table = preg_split('#\s+#s', $table);
+			
+				$name = array_shift($table);
+				
+				$name = explode('.', $name);
+				$name = array_pop($name);
+				
+				$alias = array_shift($table);
+				
+				if(!$alias)
+					$alias = $name;
+			
+				$name = $this->_adapter->unquoteIdentifier($name);
+				$alias = $this->_adapter->unquoteIdentifier($alias);
+
+				$tables[$alias] = $this->_adapter->getTable($name);
 			
 			}
 		
 		}
 
-		return $tables;
-	
-	}	
-	
-	private function _extractTables($aliased_tables) {
-	
-		if(!is_array($aliased_tables))
-			$aliased_tables = preg_split('#\s*,\s*#s', $aliased_tables);
-	
-		$tables = array();
-	
-		foreach($aliased_tables as $table) {
-
-			$table = trim($table);
-		
-			$table = preg_split('#\s+#s', $table);
-		
-			$name = array_shift($table);
-			
-			$name = explode('.', $name);
-			$name = array_pop($name);
-			
-			$alias = array_shift($table);
-			
-			if(!$alias)
-				$alias = $name;
-		
-			$name = $this->_adapter->unquoteIdentifier($name);
-			$alias = $this->_adapter->unquoteIdentifier($alias);
-
-			$tables[$alias] =  $this->_adapter->getTable($name);
-
-		}
-		
 		return $tables;
 	
 	}	
@@ -632,26 +632,87 @@ class Yab_Db_Statement implements Iterator, Countable {
 	}
 
 	public function orderBy($order_by) {
-		
+
 		if(!is_array($order_by))
 			$order_by = array($order_by => 'ASC');
 
-		$sql_parts = preg_split('#\s+ORDER\s+BY\s+#', $this->_sql);
-	
-		$order_by_clause = array_pop($sql_parts);
+		$tables = $this->getTables();
+		$select = $this->getSelect(true);
 		
-		if(!preg_match('#^[a-zA-Z0-9\s\._,]+$#', $order_by_clause))
-			array_push($sql_parts, $order_by_clause);
+		foreach($order_by as $field => $order) {
 			
-		$sql = implode(' ORDER BY ', $sql_parts);
-		
-		foreach($order_by as $column => $order)
-			$order_by[$column] = $column.' '.$order;
+			unset($order_by[$field]);
+			
+			$field = trim($field);
+			
+			$order = strtoupper(trim($order));
+			
+			if(!in_array($order, array('ASC', 'DESC')))
+				$order = 'ASC';
+			
+			$field = preg_replace('#^[a-zA-Z0-9\-_]+\.#', '', $field);
 
-		$sql .= ' ORDER BY '.implode(', ', $order_by);
+			$valid = false;
+			
+			foreach($select as $alias => $expression) {
+			
+				if($alias == $field || $expression == $field) {
+						
+					$order_by[$field] = $this->_adapter->quoteIdentifier($field).' '.$order;	
+					$valid = true;
+					break;
+					
+				}
+			
+			}
+			
+			if($valid)
+				continue;
+			
+			foreach($tables as $alias => $table) {
 
-		$this->_sql = $sql;
+				if($table instanceof self) {
+				
+					foreach($table->getSelect() as $ralias => $_expression) {
+					
+						if($ralias == $field || $_expression == $field) {
+						
+							$order_by[$field] = $this->_adapter->quoteIdentifier($alias).'.'.$this->_adapter->quoteIdentifier($field).' '.$order;	
+							$valid = true;
+							break;
+							
+						}
+					
+					}
 	
+				} else {
+				
+					foreach($table->getColumns() as $column) {
+					
+						if($column->getName() == $field) {
+						
+							$order_by[$field] = $this->_adapter->quoteIdentifier($alias).'.'.$this->_adapter->quoteIdentifier($field).' '.$order;	
+							$valid = true;
+							break;
+							
+						}
+					
+					}
+
+				}
+				
+				if($valid)
+					break;
+			
+			}
+
+			if(!$valid)
+				throw new Yab_Exception('"'.$field.'" is not a valid sort for this query');
+
+		}
+		
+		$this->_sql = $this->unpack(preg_replace('#\s+ORDER\s+BY\s.*$#s', '', $this->getPackedSql())).' ORDER BY '.implode(', ', $order_by);
+
 		return $this;
 
 	}
