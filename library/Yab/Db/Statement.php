@@ -631,6 +631,18 @@ class Yab_Db_Statement implements Iterator, Countable {
 
 	}
 
+	public function getPrefixFromColumn($column) {
+	
+		return $this->_adapter->unQuoteIdentifier(array_shift(explode('.', $this->prefixColumn($column))));
+	
+	}
+	
+	public function getColumnFromColumn($column) {
+	
+		return $this->_adapter->unQuoteIdentifier(array_pop(explode('.', $this->prefixColumn($column))));
+	
+	}
+	
 	public function prefixColumn($initial_field) {
 
 		$field = trim($initial_field);
@@ -683,7 +695,7 @@ class Yab_Db_Statement implements Iterator, Countable {
 		throw new Yab_Exception('"'.$initial_field.'" is not a valid column in this SQL statement');
 		
 	}
-	
+
 	public function orderBy($order_by) {
 
 		if(!is_array($order_by))
