@@ -631,86 +631,67 @@ class Yab_Db_Statement implements Iterator, Countable {
 
 	}
 
+	public function prefixColumn($initial_field) {
+
+		$field = trim($initial_field);
+
+		$table_alias = null;
+		
+		if(preg_match('#^(.+)\..+#', $field, $match)) {
+		
+			$table_alias = $this->_adapter->unQuoteIdentifier($match[1]);
+		
+			$field = preg_replace('#^(.+)\.+#', '', $field);
+		
+		}
+		
+		$tables = $this->getTables();
+		
+		if($table_alias) {
+		
+			if(!array_key_exists($table_alias, $tables))
+				throw new Yab_Exception('"'.$table_alias.'" from "'.$initial_field.'" is not a valid table alias in this SQL statement');
+				
+			$tables = array($table_alias => $tables[$table_alias]);
+
+		} else {
+		
+			foreach($this->getSelect() as $alias => $expression) 
+				if($alias == $field || $expression == $field) 
+					return $this->_adapter->quoteIdentifier($field);
+		
+		}
+		
+		foreach($tables as $table_alias => $table) {
+		
+			if($table instanceof self) {
+			
+				foreach($table->getSelect() as $ralias => $_expression) 				
+					if($ralias == $field || $_expression == $field) 					
+						return $this->_adapter->quoteIdentifier($table_alias).'.'.$this->_adapter->quoteIdentifier($field);
+						
+			} else {
+			
+				foreach($table->getColumns() as $column)
+					if($column->getName() == $field)
+						return $this->_adapter->quoteIdentifier($table_alias).'.'.$this->_adapter->quoteIdentifier($field);
+						
+			}
+
+		}
+		
+		throw new Yab_Exception('"'.$initial_field.'" is not a valid column in this SQL statement');
+		
+	}
+	
 	public function orderBy($order_by) {
 
 		if(!is_array($order_by))
 			$order_by = array($order_by => 'ASC');
 
-		$tables = $this->getTables();
-		$select = $this->getSelect(true);
-		
-		foreach($order_by as $field => $order) {
-			
-			unset($order_by[$field]);
-			
-			$field = trim($field);
-			
-			$order = strtoupper(trim($order));
-			
-			if(!in_array($order, array('ASC', 'DESC')))
-				$order = 'ASC';
-			
-			$field = preg_replace('#^[a-zA-Z0-9\-_]+\.#', '', $field);
+		foreach($order_by as $field => $order) 
+			$order_by[$field] = $this->prefixColumn($field).' '.$order;	
 
-			$valid = false;
-			
-			foreach($select as $alias => $expression) {
-			
-				if($alias == $field || $expression == $field) {
-						
-					$order_by[$field] = $this->_adapter->quoteIdentifier($field).' '.$order;	
-					$valid = true;
-					break;
-					
-				}
-			
-			}
-			
-			if($valid)
-				continue;
-			
-			foreach($tables as $alias => $table) {
-
-				if($table instanceof self) {
-				
-					foreach($table->getSelect() as $ralias => $_expression) {
-					
-						if($ralias == $field || $_expression == $field) {
-						
-							$order_by[$field] = $this->_adapter->quoteIdentifier($alias).'.'.$this->_adapter->quoteIdentifier($field).' '.$order;	
-							$valid = true;
-							break;
-							
-						}
-					
-					}
-	
-				} else {
-				
-					foreach($table->getColumns() as $column) {
-					
-						if($column->getName() == $field) {
-						
-							$order_by[$field] = $this->_adapter->quoteIdentifier($alias).'.'.$this->_adapter->quoteIdentifier($field).' '.$order;	
-							$valid = true;
-							break;
-							
-						}
-					
-					}
-
-				}
-				
-				if($valid)
-					break;
-			
-			}
-
-			if(!$valid)
-				throw new Yab_Exception('"'.$field.'" is not a valid sort for this query');
-
-		}
-		
 		$this->_sql = $this->unpack(preg_replace('#\s+ORDER\s+BY\s.*$#s', '', $this->getPackedSql())).' ORDER BY '.implode(', ', $order_by);
 
 		return $this;
