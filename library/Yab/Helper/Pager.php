@@ -37,6 +37,8 @@ class Yab_Helper_Pager {
 	private $_export_url_tag = 'e';
 	private $_filter_url_tag = 'f';
 
+	private $_mixed_filters = array();
+	
 	public function __construct(Yab_Db_Statement $statement, $prefix = null) {
 
 		$this->_statement = $statement;
@@ -100,33 +102,34 @@ class Yab_Helper_Pager {
 
 		$form = null;
 		
-		foreach($table_aliases as $table_alias => $columns) {
-		
-			if(!is_array($columns))
-				$columns = array($columns);
-		
-			foreach($columns as $column_key => $column_value) {
-			
-				if(is_numeric($column_key)) {
-				
-					$column_key = $column_value;
-					$column_value = null;
-				
-				}
-				
-				$element = $this->getFilter($table_alias, $column_key, $column_value, $form);
-				
-				$form = $element->getForm();
+		foreach($table_aliases as $column_key => $column_value) {
 
+			if(is_numeric($column_key)) {
+			
+				$column_key = $column_value;
+				$column_value = null;
+			
 			}
-		
+			
+			$element = $this->getFilter($column_key, $column_value, $form);
+			
+			$form = $element->getForm();
+
 		}
 
 		return $form;
 
 	}
 	
-	public function getFilter($table_alias, $column_key, $column_value = null, Yab_Form $form = null) {
+	public function mixFilter($column_key, array $column_keys) {
+	
+		$this->_mixed_filters[$this->_statement->getPrefixFromColumn($column_key).'.'.$this->_statement->getColumnFromColumn($column_key)] = $column_keys;
+
+		return $this;
+	
+	}
+	
+	public function getFilter($column_key, $column_value = null, Yab_Form $form = null) {
 	
 		if($form === null) {
 	
@@ -135,7 +138,10 @@ class Yab_Helper_Pager {
 			$form->set('method', 'get')->set('action', '');
 		
 		}
-
+		
+		$table_alias = $this->_statement->getPrefixFromColumn($column_key);
+		$column_key = $this->_statement->getColumnFromColumn($column_key);
+	
 		$filter_name = $this->_prefix.$this->_filter_url_tag.$table_alias.self::FILTER_PARAM_SEPARATOR.$column_key;
 	
 		$attributes = array(
@@ -146,17 +152,17 @@ class Yab_Helper_Pager {
 		);
 		
 		if($column_value) {
-		
+
 			$statement = $this->_getFilteredStatement();
 			$adapter = $statement->getAdapter();
 			
 			$statement->select(
 				'DISTINCT '.
-				$adapter->quoteIdentifier($table_alias).'.'.$adapter->quoteIdentifier($column_key).', '.
-				$adapter->quoteIdentifier($table_alias).'.'.$adapter->quoteIdentifier($column_value)
-			)->orderBy(
-				array($column_value => 'asc')
-			)->setKey($column_key)->setValue($column_value);
+				$this->_statement->prefixColumn($column_key).', '.
+				$this->_statement->prefixColumn($column_value))
+			->orderBy(array($column_value => 'asc'))
+			->setKey($this->_statement->getColumnFromColumn($column_key))
+			->setValue($this->_statement->getColumnFromColumn($column_value));
 		
 			$attributes['type'] = 'select';
 			$attributes['options'] = $statement;
@@ -311,18 +317,35 @@ class Yab_Helper_Pager {
 
 			foreach($columns as $column => $value) {
 				
-				if(is_array($value)) {
+				$conditions = array();
+				
+				$mixed_filters = array($table_alias.'.'.$column => $table_alias.'.'.$column);
+				
+				if(array_key_exists($table_alias.'.'.$column, $this->_mixed_filters))
+					$mixed_filters += $this->_mixed_filters[$table_alias.'.'.$column];
+			
+				foreach($mixed_filters as $mixed_filter_key) {
+				
+					$mixed_filter_alias = $this->_statement->getPrefixFromColumn($mixed_filter_key);
+					$mixed_filter_column = $this->_statement->getColumnFromColumn($mixed_filter_key);
 
-					if(count($value))
-						$statement->where($adapter->quoteIdentifier($table_alias).'.'.$adapter->quoteIdentifier($column).' IN ('.implode(', ', array_map(array($adapter, 'quote'), $value)).')');
+					if(is_array($value)) {
 
-				} else {
+						if(count($value))
+							$conditions[] = $adapter->quoteIdentifier($mixed_filter_alias).'.'.$adapter->quoteIdentifier($mixed_filter_column).' IN ('.implode(', ', array_map(array($adapter, 'quote'), $value)).')';
 
-					if($value)
-						$statement->where($adapter->quoteIdentifier($table_alias).'.'.$adapter->quoteIdentifier($column).' LIKE '.$adapter->quote('%'.$value.'%'));
+					} else {
+
+						if($value)
+							$conditions[] = $adapter->quoteIdentifier($mixed_filter_alias).'.'.$adapter->quoteIdentifier($mixed_filter_column).' LIKE '.$adapter->quote('%'.$value.'%');
+
+					}
 
 				}
-			
+
+				if(count($conditions)) 
+					$statement->where(implode(' OR ', $conditions));
+	
 			}
 
 		}
