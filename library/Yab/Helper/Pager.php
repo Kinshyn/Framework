@@ -36,8 +36,6 @@ class Yab_Helper_Pager {
 	private $_clear_url_tag = 'c';
 	private $_export_url_tag = 'e';
 	private $_filter_url_tag = 'f';
-
-	private $_mixed_filters = array();
 	
 	public function __construct(Yab_Db_Statement $statement, $prefix = null) {
 
@@ -121,16 +119,37 @@ class Yab_Helper_Pager {
 
 	}
 	
-	public function mixFilter($column_key, array $column_keys) {
-	
-		$this->_mixed_filters[$this->_statement->getPrefixFromColumn($column_key).'.'.$this->_statement->getColumnFromColumn($column_key)] = $column_keys;
-
-		return $this;
-	
-	}
-	
 	public function getFilter($column_key, $column_value = null, Yab_Form $form = null) {
+
+		$additionnal_columns = array();
 	
+		if(is_array($column_key)) {
+		
+			$additionnal_columns = $column_key;
+		
+			foreach($additionnal_columns as $key => $value) {
+			
+				unset($additionnal_columns[$key]);
+			
+				if(is_numeric($key)) {
+				
+					$key = $value;
+					$value = null;
+				
+				}
+				
+				$column_key = $key;
+				$column_value = $value;
+			
+				break;
+			
+			}
+			
+			$form = $column_value;
+			$column_value = null;
+			
+		}
+
 		if($form === null) {
 	
 			$form = new Yab_Form();
@@ -142,18 +161,18 @@ class Yab_Helper_Pager {
 		$table_alias = $this->_statement->getPrefixFromColumn($column_key);
 		$column_key = $this->_statement->getColumnFromColumn($column_key);
 	
-		$filter_name = $this->_prefix.$this->_filter_url_tag.$table_alias.self::FILTER_PARAM_SEPARATOR.$column_key;
-	
+		$filter_name = $this->_prefix.$this->_filter_url_tag.$table_alias.self::FILTER_PARAM_SEPARATOR.$column_key.self::FILTER_PARAM_SEPARATOR;
+
 		$attributes = array(
 			'id' => $filter_name,
 			'name' => $filter_name,
 			'type' => 'text',
-			'value' => $this->_session->has($filter_name) ? $this->_session->get($filter_name) : null,
 		);
 		
 		if($column_value) {
 
-			$statement = $this->_getFilteredStatement();
+			//$statement = $this->_getFilteredStatement();
+			$statement = clone $this->_statement;
 			$adapter = $statement->getAdapter();
 			
 			$statement->select(
@@ -172,8 +191,38 @@ class Yab_Helper_Pager {
 		$form->setElement($filter_name, $attributes);
 
 		$element = $form->getElement($filter_name);
+
+		$element->set('value', $this->_getParam($this->_filter_url_tag.$table_alias.self::FILTER_PARAM_SEPARATOR.$column_key.self::FILTER_PARAM_SEPARATOR));
+
+		$post_html = '';
 		
-		$element->set('value', $this->_session->has($filter_name) ? $this->_session->get($filter_name) : null);
+		foreach($additionnal_columns as $key => $value) {
+		
+			if(is_numeric($key)) {
+			
+				$key = $value;
+				$value = null;
+			
+			}
+			
+			$additionnal_table_alias = $this->_statement->getPrefixFromColumn($key);
+			$additionnal_column_key = $this->_statement->getColumnFromColumn($key);
+			$additionnal_filter_name = $this->_prefix.$this->_filter_url_tag.$additionnal_table_alias.self::FILTER_PARAM_SEPARATOR.$additionnal_column_key.self::FILTER_PARAM_SEPARATOR.'OR';
+		
+			$additionnal_attributes = array(
+				'id' => $additionnal_filter_name,
+				'name' => $additionnal_filter_name,
+				'type' => 'hidden',
+				'value' => $filter_name,
+			);
+			
+			$form->setElement($additionnal_filter_name, $additionnal_attributes);
+			
+			$post_html .= $form->getElement($additionnal_filter_name)->getHtml();
+		
+		}
+		
+		$element->set('post_html', $post_html);
 		
 		return $element;
 
@@ -313,40 +362,28 @@ class Yab_Helper_Pager {
 
 		$filters = $this->_getFilters();
 
-		foreach($filters as $table_alias => $columns) {
+		foreach($filters as $columns) {
 
+			$conditions = array();
+			
 			foreach($columns as $column => $value) {
 				
-				$conditions = array();
-				
-				$mixed_filters = array($table_alias.'.'.$column => $table_alias.'.'.$column);
-				
-				if(array_key_exists($table_alias.'.'.$column, $this->_mixed_filters))
-					$mixed_filters += $this->_mixed_filters[$table_alias.'.'.$column];
-			
-				foreach($mixed_filters as $mixed_filter_key) {
-				
-					$mixed_filter_alias = $this->_statement->getPrefixFromColumn($mixed_filter_key);
-					$mixed_filter_column = $this->_statement->getColumnFromColumn($mixed_filter_key);
+				if(is_array($value)) {
 
-					if(is_array($value)) {
+					if(count($value))
+						$conditions[] = $statement->prefixColumn($column).' IN ('.implode(', ', array_map(array($adapter, 'quote'), $value)).')';
 
-						if(count($value))
-							$conditions[] = $adapter->quoteIdentifier($mixed_filter_alias).'.'.$adapter->quoteIdentifier($mixed_filter_column).' IN ('.implode(', ', array_map(array($adapter, 'quote'), $value)).')';
+				} else {
 
-					} else {
-
-						if($value)
-							$conditions[] = $adapter->quoteIdentifier($mixed_filter_alias).'.'.$adapter->quoteIdentifier($mixed_filter_column).' LIKE '.$adapter->quote('%'.$value.'%');
-
-					}
+					if($value)
+						$conditions[] = $statement->prefixColumn($column).' LIKE '.$adapter->quote('%'.$value.'%');
 
 				}
-
-				if(count($conditions)) 
-					$statement->where(implode(' OR ', $conditions));
-	
+				
 			}
+
+			if(count($conditions)) 
+				$statement->where(implode(' OR ', $conditions));
 
 		}
 
@@ -466,19 +503,32 @@ class Yab_Helper_Pager {
 		$filters = array();
 
 		$params = $this->_request->getPost()->toArray() + $this->_request->getGet()->toArray() + $this->_session->toArray();
-		
+
 		foreach($params as $key => $value) {
-		
-			if(!preg_match('#'.preg_quote($this->_prefix.$this->_filter_url_tag, '#').'([^'.preg_quote(self::FILTER_PARAM_SEPARATOR, '#').']+)'.preg_quote(self::FILTER_PARAM_SEPARATOR, '#').'([^'.preg_quote(self::FILTER_PARAM_SEPARATOR, '#').']+)$#i', $key, $match))
+
+			if(!preg_match('#'.preg_quote($this->_prefix.$this->_filter_url_tag, '#').'([^'.preg_quote(self::FILTER_PARAM_SEPARATOR, '#').']+)'.preg_quote(self::FILTER_PARAM_SEPARATOR, '#').'([^'.preg_quote(self::FILTER_PARAM_SEPARATOR, '#').']+)'.preg_quote(self::FILTER_PARAM_SEPARATOR, '#').'(OR)?$#i', $key, $match))
 				continue;
 
-			if(!array_key_exists($match[1], $filters) || !is_array($filters[$match[1]]))
-				$filters[$match[1]] = array();
-			
-			$filters[$match[1]][$match[2]] = $this->_getParam($this->_filter_url_tag.$match[1].self::FILTER_PARAM_SEPARATOR.$match[2]);
+			$param = $this->_getParam(preg_replace('#^'.preg_quote($this->_prefix, '#').'#', '', $match[0]));
 
+			if(preg_match('#'.preg_quote($this->_prefix.$this->_filter_url_tag, '#').'([^'.preg_quote(self::FILTER_PARAM_SEPARATOR, '#').']+)'.preg_quote(self::FILTER_PARAM_SEPARATOR, '#').'([^'.preg_quote(self::FILTER_PARAM_SEPARATOR, '#').']+)'.preg_quote(self::FILTER_PARAM_SEPARATOR, '#').'$#i', $param, $param_match)) {
+	
+				if(!array_key_exists($param_match[1].'.'.$param_match[2], $filters))
+					$filters[$param_match[1].'.'.$param_match[2]] = array();
+					
+				$filters[$param_match[1].'.'.$param_match[2]][$match[1].'.'.$match[2]] = $this->_getParam(preg_replace('#^'.preg_quote($this->_prefix, '#').'#', '', $param_match[0]));
+			
+			} else {
+	
+				if(!array_key_exists($match[1].'.'.$match[2], $filters))
+					$filters[$match[1].'.'.$match[2]] = array();
+				
+				$filters[$match[1].'.'.$match[2]][$match[1].'.'.$match[2]] = $param;
+			
+			}
+			
 		}
-		
+			
 		return $filters;
 	
 	}
