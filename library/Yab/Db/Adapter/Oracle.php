@@ -76,7 +76,7 @@ class Yab_Db_Adapter_Oracle extends Yab_Db_Adapter_Abstract {
 		
 		$data = oci_fetch_assoc($rowset);
                 
-                if(array_key_exists(self::YAB_LIMIT_ROWNUM, $data))
+                if(is_array($data) && array_key_exists(self::YAB_LIMIT_ROWNUM, $data))
                         unset($data[self::YAB_LIMIT_ROWNUM]);
                 
                 return $data;
