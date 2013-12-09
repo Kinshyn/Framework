@@ -74,8 +74,8 @@ class Yab_Form extends Yab_Object {
 		if($this->isSubmitted()) {
 		
 			foreach($this->_elements as $element) {
-			
-				foreach($element->getErrors($filters) as $error_code => $message) {
+				
+				foreach($element->getErrors(null, $filters) as $error_code => $message) {
 				
 					if(!array_key_exists($element->get('name'), $errors)) 
 						$errors[$element->get('name')] = array();
