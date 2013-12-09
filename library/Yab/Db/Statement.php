@@ -350,14 +350,16 @@ class Yab_Db_Statement implements Iterator, Countable {
 
 	}
 	
-	public function pack() {
+	public function pack($recursive_pack = true) {
 
 		if(count($this->_packs))
 			throw new Yab_Exception('You can not pack an already packed statement');
 
 		$regexps = array();
 		
-		array_unshift($regexps, '#(\([^\)\(]*\))#');
+		if($recursive_pack)
+			array_unshift($regexps, '#(\([^\)\(]*\))#');
+			
 		array_push($regexps, '#('.preg_quote(substr($this->_adapter->quote('"'), 1, -1), '#').')#');
 		array_push($regexps, '#("[^"]*")#');
 		array_push($regexps, '#('.preg_quote(substr($this->_adapter->quote("'"), 1, -1), '#').')#');
