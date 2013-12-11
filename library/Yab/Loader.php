@@ -519,6 +519,12 @@ class Yab_Loader {
 
 	}
 
+	final public function getLog() {
+
+		return Yab_Loader::getInstance('Yab_Log');
+
+	}
+
 	final public function forward($controller, $action = null, array $params = array(), $code = null) {
 
 		return $this->getResponse()->redirect($this->getRequest($controller, $action, $params), $code);
