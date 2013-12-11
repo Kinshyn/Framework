@@ -93,9 +93,14 @@ class Yab_Log {
 
 		$formatted_event = date('H:i:s').' '.$_SERVER['REMOTE_ADDR'].' '.getmypid().' '.strtoupper($severity).' "'.$event.'" in '.$lastTrace['file'].', line '.$lastTrace['line'].PHP_EOL;
 
-		if(!$this->_fhandler) 
+		if(!$this->_fhandler) {
+		
 			$this->_fhandler = fopen($this->_file, 'a+', true);
-
+			
+			chmod($this->_file, 0777);
+			
+		}
+		
 		if(!$this->_fhandler) 
 			throw new Yab_Exception($this->_file.' can not be opened');
 
