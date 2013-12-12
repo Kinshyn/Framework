@@ -78,8 +78,16 @@ class Yab_Db_Table extends Yab_Object {
 	
 	public function init() {
 		
-		foreach($this->getColumns() as $column)
+		$this->clear();
+		
+		foreach($this->getColumns() as $column) {
+			
+			if($column->getPrimary() && !$column->getDefaultValue())
+				continue;
+				
 			parent::set($column->getName(), $column->getDefaultValue() ? $column->getDefaultValue() : ($column->getNull() ? null : $column->getDefaultValue()));
+			
+		}
 		
 		return $this;
 	
