@@ -71,13 +71,18 @@ class Yab_Db_Table extends Yab_Object {
 		# trying to give the table name
 		if($this->_name === null && $name !== null) 
 			$this->_name = $this->_adapter->unQuoteIdentifier($name);
-			
-		if(!count($this))
-			foreach($this->getColumns() as $column)
-				parent::set($column->getName(), null);
 
 		$this->_init();
 
+	}
+	
+	public function init() {
+		
+		foreach($this->getColumns() as $column)
+			parent::set($column->getName(), $column->getDefaultValue() ? $column->getDefaultValue() : ($column->getNull() ? null : $column->getDefaultValue()));
+		
+		return $this;
+	
 	}
 	
 	protected function _init() {}
