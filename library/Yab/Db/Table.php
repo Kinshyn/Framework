@@ -63,7 +63,7 @@ class Yab_Db_Table extends Yab_Object {
 			$this->_schema = $schema;
 
 		}
-		
+			
 		# trying to directly find by primary_key
 		if($this->_name !== null && $name !== null)
 			$this->feed($this->find($name)->toArray());
@@ -72,6 +72,10 @@ class Yab_Db_Table extends Yab_Object {
 		if($this->_name === null && $name !== null) 
 			$this->_name = $this->_adapter->unQuoteIdentifier($name);
 			
+		if(!count($this))
+			foreach($this->getColumns() as $column)
+				parent::set($column->getName(), null);
+
 		$this->_init();
 
 	}
@@ -143,9 +147,9 @@ class Yab_Db_Table extends Yab_Object {
 	}
 
 	final public function hasColumn($name) {
-
-		foreach($this->getColumns() as $column)
-			if($column->getName() == $name)
+		
+		foreach($this->getColumns() as $column) 
+			if($column->getName() == $name) 
 				return true;
 
 		return false;
