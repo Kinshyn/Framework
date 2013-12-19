@@ -143,7 +143,7 @@ class Yab_Db_Adapter_Oracle extends Yab_Db_Adapter_Abstract {
 		$columns = array();
 
 		$rowset = $this->query("
-			SELECT utc.*, CASE WHEN ucc.column_name IS NULL THEN 'primary' ELSE NULL END AS IS_PRIMARY
+			SELECT utc.*, CASE WHEN ucc.column_name IS NULL THEN 0 ELSE 1 END AS IS_PRIMARY
 			FROM user_tab_columns utc 
 			LEFT JOIN user_constraints uc ON uc.table_name = utc.table_name AND uc.constraint_type = 'P'
 			LEFT JOIN user_cons_columns ucc ON uc.constraint_name = ucc.constraint_name AND ucc.column_name = utc.column_name
