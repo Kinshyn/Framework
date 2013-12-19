@@ -463,8 +463,13 @@ class Yab_Db_Statement implements Iterator, Countable {
 			
 			$alias = array_pop($sql_select);
 			
-			if(!$alias) 
-				$alias = $this->_adapter->unQuoteIdentifier(array_pop(explode('.', $expression)));
+			if(!$alias) {
+			
+				$alias = explode('.', $expression);
+				
+				$alias = $this->_adapter->unQuoteIdentifier(array_pop($alias));
+				
+			}
 
 			if($explain_wildcards && preg_match('#^(.+)\.\s*\*$#', $expression, $match)) {
 			
