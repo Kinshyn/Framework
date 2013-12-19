@@ -142,8 +142,10 @@ class Yab_Db_Adapter_Oracle extends Yab_Db_Adapter_Abstract {
 		$columns = array();
 
 		$rowset = $this->query("
-			SELECT utc.*
-			FROM user_tab_columns utc
+			SELECT utc.*, CASE WHEN ucc.column_name IS NULL THEN 'primary' ELSE NULL END AS IS_PRIMARY
+			FROM user_tab_columns utc 
+			LEFT JOIN user_constraints uc ON uc.table_name = utc.table_name AND uc.constraint_type = 'P'
+			LEFT JOIN user_cons_columns ucc ON uc.constraint_name = ucc.constraint_name AND ucc.column_name = utc.column_name
 			WHERE utc.table_name = ".$this->quote($this->unQuoteIdentifier($table))."
 		;");
 
@@ -156,22 +158,11 @@ class Yab_Db_Adapter_Oracle extends Yab_Db_Adapter_Abstract {
 			$column->setDefaultValue($column->getNull() && !$row['DATA_DEFAULT'] ? null : $row['DATA_DEFAULT']);
 			$column->setNumber(count($columns));
 			$column->setType($row['DATA_TYPE']);
+			
+			if($row['IS_PRIMARY'])
+				$column->setPrimary(true)->addUnique('PRIMARY')->addIndex('PRIMARY');
 
 			$columns[$row['COLUMN_NAME']] = clone $column;
-
-		}
-		
-		$rowset = $this->query("
-			SELECT ucc.*, uc.*
-			FROM user_cons_columns ucc
-			INNER JOIN user_constraints uc ON uc.constraint_name = ucc.constraint_name
-			WHERE uc.constraint_type = 'P'
-			AND uc.table_name = ".$this->quote($this->unQuoteIdentifier($table))."
-		;");
-
-		while($row = $this->fetch($rowset)) {
-
-			$columns[$row['COLUMN_NAME']]->setPrimary(true)->addUnique('PRIMARY')->addIndex('PRIMARY');
 
 		}
 
