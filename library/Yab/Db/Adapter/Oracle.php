@@ -19,6 +19,7 @@ class Yab_Db_Adapter_Oracle extends Yab_Db_Adapter_Abstract {
 	private $_host = null;
 	private $_login = null;
 	private $_password = null;
+	private $_encoding = null;
 
 	private $_tmp_tables = array();
 	private $_selected_schema = array();
@@ -210,7 +211,7 @@ class Yab_Db_Adapter_Oracle extends Yab_Db_Adapter_Abstract {
 
 	protected function _connect() {
 
-		$this->_connexion = oci_connect($this->_login, $this->_password, $this->_host);
+		$this->_connexion = oci_connect($this->_login, $this->_password, $this->_host, $this->_encoding);
 
 		if(!$this->isConnected())
 			throw new Yab_Exception('can not connect to oracle server with this host, login, password');
