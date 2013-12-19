@@ -18,6 +18,8 @@ abstract class Yab_Db_Adapter_Abstract {
 
 	private $_columns = array();
 	
+	private $_schema = null;
+	
 	final public function __construct() {
 
 		if(!self::hasDefaultAdapter())
@@ -106,9 +108,11 @@ abstract class Yab_Db_Adapter_Abstract {
 
 	final public function setSchema($schema) {
 
+		$this->_schema = $schema;
+	
 		if(!$this->isConnected())
-			$this->connect();
-
+			return $this;
+		
 		$this->_setSchema($schema);
 
 		return $this;
@@ -121,6 +125,9 @@ abstract class Yab_Db_Adapter_Abstract {
 			throw new Yab_Exception('already connected to the db server');
 
 		$this->_connect();
+		
+		if($this->_schema)
+			$this->_setSchema($this->_schema);
 
 		return $this;
 
