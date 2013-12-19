@@ -75,12 +75,12 @@ class Yab_Db_Adapter_Oracle extends Yab_Db_Adapter_Abstract {
 
 	public function fetch($rowset) {
 		
-		$data = oci_fetch_assoc($rowset);
+		$data = oci_fetch_array($rowset, OCI_ASSOC + OCI_RETURN_NULLS + OCI_RETURN_LOBS);
                 
-                if(is_array($data) && array_key_exists(self::YAB_LIMIT_ROWNUM, $data))
-                        unset($data[self::YAB_LIMIT_ROWNUM]);
-                
-                return $data;
+		if(is_array($data) && array_key_exists(self::YAB_LIMIT_ROWNUM, $data))
+			unset($data[self::YAB_LIMIT_ROWNUM]);
+			
+		return $data;
 
 	}
 
